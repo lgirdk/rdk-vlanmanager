@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+ If not stated otherwise in this file or this component's Licenses.txt file the
+ following copyright and licenses apply:
+
+ Copyright 2020 RDK Management
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+<dataModelInfo>
+<version>1</version>
+<moduleName>COSA_TR181_RdkVlanManager</moduleName>
+<author></author>
+<description></description>
+<library/>
+ <objects>
+  <object>
+  <name>X_RDK_Ethernet</name>
+  <objectType>object</objectType>
+   <objects>
+    <object>
+     <name>Link</name>
+     <objectType>writableTable</objectType>
+     <maxInstance>128</maxInstance>
+     <functions>
+      <func_GetEntryCount>EthLink_GetEntryCount</func_GetEntryCount>
+      <func_GetEntry>EthLink_GetEntry</func_GetEntry>
+      <func_AddEntry>EthLink_AddEntry</func_AddEntry>
+      <func_DelEntry>EthLink_DelEntry</func_DelEntry>
+      <func_GetParamBoolValue>EthLink_GetParamBoolValue</func_GetParamBoolValue>
+      <func_GetParamUlongValue>EthLink_GetParamUlongValue</func_GetParamUlongValue>
+      <func_GetParamStringValue>EthLink_GetParamStringValue</func_GetParamStringValue>
+      <func_SetParamBoolValue>EthLink_SetParamBoolValue</func_SetParamBoolValue>
+      <func_SetParamUlongValue>EthLink_SetParamUlongValue</func_SetParamUlongValue>
+      <func_SetParamStringValue>EthLink_SetParamStringValue</func_SetParamStringValue>
+      <func_Validate>EthLink_Validate</func_Validate>
+      <func_Commit>EthLink_Commit</func_Commit>
+      <func_Rollback>EthLink_Rollback</func_Rollback>
+     </functions>
+     <parameters>
+      <parameter>
+       <name>Enable</name>
+       <type>boolean</type>
+       <syntax>bool</syntax>
+       <writable>true</writable>
+      </parameter>
+      <parameter>
+       <name>Status</name>
+       <type> string: Up(1),Down(2),Unknown(3),Dormant(4),NotPresent(5),LowerLayerDown(6),Error(7) </type>
+       <syntax>uint32/mapped</syntax>
+      </parameter>
+      <parameter>
+       <name>Alias</name>
+       <type>string(64)</type>
+       <syntax>string</syntax>
+       <writable>true</writable>
+      </parameter>
+      <parameter>
+       <name>Name</name>
+       <type>string(64)</type>
+       <syntax>string</syntax>
+       <writable>true</writable>
+      </parameter>
+      <parameter>
+       <name>LowerLayers</name>
+       <type>string(1024)</type>
+       <syntax>string</syntax>
+      <writable>true</writable>
+      </parameter>
+       <parameter>
+       <name>MACAddress</name>
+       <type>string(17)</type>
+       <syntax>string</syntax>
+      </parameter>
+      <parameter>
+       <name>PriorityTagging</name>
+       <type>boolean</type>
+       <syntax>bool</syntax>
+       <writable>true</writable>
+      </parameter>
+      <parameter>
+       <name>X_RDK_Refresh</name>
+       <type>boolean</type>
+       <syntax>bool</syntax>
+       <writable>true</writable>
+      </parameter>
+     </parameters>
+    <objects>
+     <object>
+     <name>X_RDK_Marking</name>
+     <objectType>dynamicTable</objectType>
+     <maxInstance>128</maxInstance>
+     <functions>
+      <func_GetEntryCount>Marking_GetEntryCount</func_GetEntryCount>
+      <func_GetEntry>Marking_GetEntry</func_GetEntry>
+      <func_IsUpdated>Marking_IsUpdated</func_IsUpdated>
+      <func_Synchronize>Marking_Synchronize</func_Synchronize>
+      <func_GetParamIntValue>Marking_GetParamIntValue</func_GetParamIntValue>
+      <func_GetParamUlongValue>Marking_GetParamUlongValue</func_GetParamUlongValue>
+     </functions>
+     <parameters>
+      <parameter>
+       <name>SKBPort</name>
+       <type>unsignedInt</type>
+       <syntax>uint32</syntax>
+      </parameter>
+      <parameter>
+       <name>EthernetPriorityMark</name>
+       <type>int</type>
+       <syntax>int</syntax>
+       <writable>true</writable>
+      </parameter>
+     </parameters>
+    </object>
+    </objects>
+    </object>
+    <object>
+     <name>VLANTermination</name>
+     <objectType>writableTable</objectType>
+     <maxInstance>128</maxInstance>
+     <functions>
+      <func_GetEntryCount>Vlan_GetEntryCount</func_GetEntryCount>
+      <func_GetEntry>Vlan_GetEntry</func_GetEntry>
+      <func_AddEntry>Vlan_AddEntry</func_AddEntry>
+      <func_DelEntry>Vlan_DelEntry</func_DelEntry>
+      <func_GetParamBoolValue>Vlan_GetParamBoolValue</func_GetParamBoolValue>
+      <func_GetParamIntValue>Vlan_GetParamIntValue</func_GetParamIntValue>
+      <func_GetParamUlongValue>Vlan_GetParamUlongValue</func_GetParamUlongValue>
+      <func_GetParamStringValue>Vlan_GetParamStringValue</func_GetParamStringValue>
+      <func_SetParamBoolValue>Vlan_SetParamBoolValue</func_SetParamBoolValue>
+      <func_SetParamIntValue>Vlan_SetParamIntValue</func_SetParamIntValue>
+      <func_SetParamUlongValue>Vlan_SetParamUlongValue</func_SetParamUlongValue>
+      <func_SetParamStringValue>Vlan_SetParamStringValue</func_SetParamStringValue>
+      <func_Validate>Vlan_Validate</func_Validate>
+      <func_Commit>Vlan_Commit</func_Commit>
+      <func_Rollback>Vlan_Rollback</func_Rollback>
+     </functions>
+     <parameters>
+      <parameter>
+       <name>Enable</name>
+       <type>boolean</type>
+       <syntax>bool</syntax>
+       <writable>true</writable>
+      </parameter>
+      <parameter>
+       <name>Status</name>
+       <type> string: Up(1),Down(2),Unknown(3),Dormant(4),NotPresent(5),LowerLayerDown(6),Error(7) </type>
+       <syntax>uint32/mapped</syntax>
+      </parameter>
+      <parameter>
+       <name>Alias</name>
+       <type>string(64)</type>
+       <syntax>string</syntax>
+       <writable>true</writable>
+      </parameter>
+      <parameter>
+       <name>Name</name>
+       <type>string(64)</type>
+       <syntax>string</syntax>
+       <writable>true</writable>
+      </parameter>
+      <parameter>
+       <name>LastChange</name>
+       <type>unsignedInt</type>
+       <syntax>uint32</syntax>
+       <writable>false</writable>
+      </parameter>
+      <parameter>
+       <name>LowerLayers</name>
+       <type>string(1024)</type>
+       <syntax>string</syntax>
+       <writable>true</writable>
+      </parameter>
+      <parameter>
+       <name>VLANID</name>
+       <type>unsignedInt</type>
+       <syntax>uint32</syntax>
+       <writable>true</writable>
+      </parameter>
+      <parameter>
+       <name>TPID</name>
+       <type>unsignedInt</type>
+       <syntax>uint32</syntax>
+       <writable>true</writable>
+      </parameter>
+      <parameter>
+       <name>X_RDK_BaseInterface</name>
+       <type>string(64)</type>
+       <syntax>string</syntax>
+       <writable>true</writable>
+      </parameter>
+     </parameters>
+    </object>
+   </objects>
+  </object>
+ </objects>
+</dataModelInfo>
