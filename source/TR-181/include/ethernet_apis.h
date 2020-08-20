@@ -65,13 +65,14 @@
 /*
     ETHERNET Part
 */
-typedef enum { Up = 1, 
-               Down, 
-               Unknown, 
-               Dormant, 
-               NotPresent, 
-               LowerLayerDown, 
-               Error 
+typedef enum { 
+               ETH_IF_UP = 1, 
+               ETH_IF_DOWN, 
+               ETH_IF_UNKNOWN, 
+               ETH_IF_DORMANT, 
+               ETH_IF_NOTPRESENT, 
+               ETH_IF_LOWERLAYERDOWN, 
+               ETH_IF_ERROR 
 }ethernet_link_status_e;
 
 typedef enum

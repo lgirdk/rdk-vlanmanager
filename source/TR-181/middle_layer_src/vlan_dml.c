@@ -303,7 +303,7 @@ Vlan_DelEntry
     if ( pVlanCxtLink->bNew )
     {
         /* Set bNew to FALSE to indicate this node is not going to save to SysRegistry */
-        pVlanCxtLink->bNew = FALSE;
+        pVlanCxtLink->bNew    = FALSE;
     }
     if ( AnscSListPopEntryByLink(&pVLAN->Q_VlanList, &pVlanCxtLink->Linkage) )
     {
@@ -617,22 +617,13 @@ Vlan_SetParamBoolValue
     if( AnscEqualString(ParamName, "Enable", TRUE))
     {
         /* save update to backup */
-        p_Vlan->Enable     = bValue;
-        if(!p_Vlan->Enable)
-        {
-            DmlDeleteVlanInterface(NULL, p_Vlan);
-        }
-        else
-        {
-            DmlCreateVlanInterface(NULL, p_Vlan);
-        }
+        p_Vlan->Enable = bValue;
         return TRUE;
     }
 
     /* CcspTraceWarning(("Unsupported parameter '%s'\n", ParamName)); */
     return FALSE;
 }
-
 
 /**********************************************************************
 
@@ -890,26 +881,31 @@ Vlan_Commit
 
     if ( pCxtLink->bNew )
     {
-        returnStatus = DmlAddVlan(NULL, p_Vlan );
-
-        if ( returnStatus == ANSC_STATUS_SUCCESS )
+        if (p_Vlan->Enable)
         {
-            pCxtLink->bNew = FALSE;
-        }
-        else
-        {
-            DML_VLAN_INIT(p_Vlan);
-            _ansc_sprintf(p_Vlan->Name, "vlan%d", p_Vlan->InstanceNumber);
-            if ( p_Vlan->Alias )
-                AnscCopyString( p_Vlan->Alias, p_Vlan->Alias );
+            returnStatus = DmlCreateVlanInterface(NULL, p_Vlan);
+            if ( returnStatus == ANSC_STATUS_SUCCESS )
+            {
+                pCxtLink->bNew = FALSE;
+            }
+            else
+            {
+                DML_VLAN_INIT(p_Vlan);
+                _ansc_sprintf(p_Vlan->Name, "vlan%d", p_Vlan->InstanceNumber);
+                if ( p_Vlan->Alias )
+                    AnscCopyString( p_Vlan->Alias, p_Vlan->Alias );
+            }
         }
     }
-    else {
+    else 
+    {
         if (p_Vlan->Enable)
         {
             returnStatus = DmlSetVlan(NULL, p_Vlan);
-            if ( returnStatus != ANSC_STATUS_SUCCESS) {
-                if( ANSC_STATUS_SUCCESS != DmlGetVlan(NULL, p_Vlan->InstanceNumber, p_Vlan)){
+            if ( returnStatus != ANSC_STATUS_SUCCESS)
+            {
+                if( ANSC_STATUS_SUCCESS != DmlGetVlan(NULL, p_Vlan->InstanceNumber, p_Vlan))
+                {
                     DML_VLAN_INIT(p_Vlan);
                     _ansc_sprintf(p_Vlan->Name, "vlan%d", p_Vlan->InstanceNumber);
                 }
@@ -917,7 +913,6 @@ Vlan_Commit
         }
         else
         {
-            /* If interface doesn't exists , return ANSC_STATUS_SUCCESS. */
             returnStatus = DmlDeleteVlanInterface(NULL, p_Vlan);
             if (returnStatus != ANSC_STATUS_SUCCESS)
             {

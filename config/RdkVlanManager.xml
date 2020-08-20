@@ -25,6 +25,54 @@
 <library/>
  <objects>
   <object>
+  <name>X_RDK_VlanManager</name>
+  <objectType>object</objectType>
+   <objects>
+    <object>
+     <name>Configuration</name>
+     <objectType>staticTable</objectType>
+     <maxInstance>8</maxInstance>
+     <functions>
+       <func_GetEntryCount>VlanCfg_GetEntryCount</func_GetEntryCount>
+       <func_GetEntry>VlanCfg_GetEntry</func_GetEntry>
+       <func_GetParamUlongValue>VlanCfg_GetParamUlongValue</func_GetParamUlongValue>
+       <func_SetParamUlongValue>VlanCfg_SetParamUlongValue</func_SetParamUlongValue>
+       <func_GetParamStringValue>VlanCfg_GetParamStringValue</func_GetParamStringValue>
+       <func_SetParamStringValue>VlanCfg_SetParamStringValue</func_SetParamStringValue>
+       <func_Validate>VlanCfg_Validate</func_Validate>
+       <func_Commit>VlanCfg_Commit</func_Commit>
+       <func_Rollback>VlanCfg_Rollback</func_Rollback>
+     </functions>
+     <parameters>
+      <parameter>
+       <name>Region</name>
+       <type>string(64)</type>
+       <syntax>string</syntax>
+       <writable>true</writable>
+      </parameter>
+      <parameter>
+       <name>VLANId</name>
+       <type>unsignedInt</type>
+       <syntax>uint32</syntax>
+       <writable>true</writable>
+      </parameter>
+      <parameter>
+       <name>TPId</name>
+       <type>unsignedInt</type>
+       <syntax>uint32</syntax>
+       <writable>true</writable>
+      </parameter>
+      <parameter>
+       <name>InterfaceType</name>
+       <type>string: DSL(1),WANOE(2),GPON(3)</type>
+       <syntax>uint32/mapped</syntax>
+       <writable>true</writable>
+      </parameter>
+     </parameters>
+    </object>
+   </objects>
+  </object>
+  <object>
   <name>X_RDK_Ethernet</name>
   <objectType>object</objectType>
    <objects>

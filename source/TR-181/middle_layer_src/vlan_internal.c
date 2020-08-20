@@ -41,6 +41,14 @@
 #include "sys_definitions.h"
 
 extern void * g_pDslhDmlAgent;
+extern char                     g_Subsystem[32];
+extern ANSC_HANDLE              bus_handle;
+
+#define PSM_VLANMANAGER_CFG_COUNT  "dmsb.vlanmanager.cfg.count"
+#define PSM_VLANMANAGER_CFG_REGION "dmsb.vlanmanager.cfg.%d.region"
+#define PSM_VLANMANAGER_CFG_IFTYPE "dmsb.vlanmanager.cfg.%d.iftype"
+#define PSM_VLANMANAGER_CFG_VLANID "dmsb.vlanmanager.cfg.%d.vlanid"
+#define PSM_VLANMANAGER_CFG_TPID   "dmsb.vlanmanager.cfg.%d.tpid"
 
 /**********************************************************************
 
@@ -95,6 +103,107 @@ VlanCreate
     return  (ANSC_HANDLE)pMyObject;
 }
 
+int DmlVlanGetPSMRecordValue ( char *pPSMEntry, char *pOutputString )
+{
+    int   retPsmGet = CCSP_SUCCESS;
+    char *strValue  = NULL;
+
+    //Validate buffer
+    if( ( NULL == pPSMEntry ) && ( NULL == pOutputString ) )
+    {
+        CcspTraceError(("%s %d Invalid buffer\n",__FUNCTION__,__LINE__));
+        return retPsmGet;
+    }
+
+    retPsmGet = PSM_Get_Record_Value2( bus_handle, g_Subsystem, pPSMEntry, NULL, &strValue );
+    if ( retPsmGet == CCSP_SUCCESS )
+    {
+        //Copy till end of the string
+        snprintf( pOutputString, strlen( strValue ) + 1, "%s", strValue );
+
+        ((CCSP_MESSAGE_BUS_INFO *)bus_handle)->freefunc(strValue);
+    }
+
+    return retPsmGet;
+}
+
+
+void VlanCfgInitialize( ANSC_HANDLE hThisObject)
+{
+    PDATAMODEL_VLAN pMyObject = (PDATAMODEL_VLAN)hThisObject;
+    char acPSMQuery[128]    = { 0 };
+    char acPSMValue[64]     = { 0 };
+    INT vlancfgCount = 0;
+    INT nIndex = 0;
+
+    /* get cfg count */
+    memset(acPSMQuery, 0, sizeof(acPSMQuery));
+    memset(acPSMValue, 0, sizeof(acPSMValue));
+    snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_CFG_COUNT );
+    if (  CCSP_SUCCESS == DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue ) )
+    {
+        vlancfgCount = atoi (acPSMValue);
+    }
+
+    pMyObject->ulVlanCfgInstanceNumber = vlancfgCount ;
+    PDML_VLAN_CFG pVlanCfg = (PDML_VLAN_CFG)AnscAllocateMemory(sizeof(DML_VLAN_CFG)* vlancfgCount);
+    memset(pVlanCfg, 0, sizeof(pVlanCfg));
+
+    for(nIndex = 0; nIndex < vlancfgCount; nIndex++)
+    {
+        pVlanCfg[nIndex].InstanceNumber = nIndex + 1;
+
+        /* get cfg region from psm */
+        memset(acPSMQuery, 0, sizeof(acPSMQuery));
+        memset(acPSMValue, 0, sizeof(acPSMValue));
+        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_CFG_REGION, nIndex + 1 );
+        if (  CCSP_SUCCESS == DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue ) )
+        {
+            strcpy(pVlanCfg[nIndex].Region, acPSMValue);
+        }
+
+        /* get cfg interfaceType from psm */
+        memset(acPSMQuery, 0, sizeof(acPSMQuery));
+        memset(acPSMValue, 0, sizeof(acPSMValue));
+        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_CFG_IFTYPE, nIndex + 1 );
+        if (  CCSP_SUCCESS == DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue ) )
+        {
+            if(0 == strncmp(acPSMValue,"DSL",3) )
+            {
+                pVlanCfg[nIndex].InterfaceType = DSL;
+            }
+            else if (0 == strncmp(acPSMValue,"WANOE",5))
+            {
+                pVlanCfg[nIndex].InterfaceType = WANOE;
+            }
+            else if (0 == strncmp(acPSMValue,"GPON",4))
+            {
+                pVlanCfg[nIndex].InterfaceType = GPON;
+            }
+        }
+
+        /* get cfg vlanid from psm */
+        memset(acPSMQuery, 0, sizeof(acPSMQuery));
+        memset(acPSMValue, 0, sizeof(acPSMValue));
+        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_CFG_VLANID, nIndex + 1 );
+        if (  CCSP_SUCCESS == DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue ) )
+        {
+            pVlanCfg[nIndex].VLANId =  atoi (acPSMValue);
+        }
+
+        /* get cfg tpid from psm */
+        memset(acPSMQuery, 0, sizeof(acPSMQuery));
+        memset(acPSMValue, 0, sizeof(acPSMValue));
+        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_CFG_TPID, nIndex + 1 );
+        if (  CCSP_SUCCESS == DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue ) )
+        {
+            pVlanCfg[nIndex].TPId = atoi (acPSMValue);
+        }
+    }
+
+    pMyObject->VlanCfg = pVlanCfg;
+
+}
 /**********************************************************************
 
     caller:     self
@@ -138,6 +247,8 @@ VlanInitialize
     {
         return returnStatus;
     }
+
+    VlanCfgInitialize( pMyObject );
 
     /* Initiation all functions */
     AnscSListInitializeHeader( &pMyObject->VLANPMappingList );

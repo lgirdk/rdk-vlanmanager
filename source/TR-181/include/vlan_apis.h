@@ -77,6 +77,23 @@ _DML_VLAN
 }
 DML_VLAN,  *PDML_VLAN;
 
+typedef enum { 
+    DSL = 1, 
+    WANOE, 
+    GPON
+}vlan_cfg_if_type_e;
+
+typedef  struct
+_DML_VLAN_CFG
+{
+    ULONG                InstanceNumber;
+    CHAR                 Region[8];
+    vlan_cfg_if_type_e   InterfaceType;
+    UINT                 VLANId;
+    UINT                 TPId;
+}
+DML_VLAN_CFG,  *PDML_VLAN_CFG;
+
 #define DML_VLAN_INIT(pVlan)                                            \
 {                                                                                  \
     (pVlan)->Enable            = FALSE;                                      \

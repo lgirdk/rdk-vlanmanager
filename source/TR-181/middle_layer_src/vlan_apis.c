@@ -441,12 +441,9 @@ DmlDeleteVlanInterface
             if ( ANSC_STATUS_SUCCESS != returnStatus )
             {
                 CcspTraceError(("%s - Failed to delete VLAN interface %s\n", __FUNCTION__, pEntry->Name));
+                return returnStatus;
             }
-            else
-            {
-                CcspTraceInfo(("%s - %s:Successfully deleted VLAN interface %s\n", __FUNCTION__, VLAN_MARKER_VLAN_IF_CREATE, pEntry->Name));
-                DmlEthSetWanStatusForBaseManager(pEntry->Alias, "Down");
-            }
+            CcspTraceInfo(("%s - %s:Successfully deleted VLAN interface %s\n", __FUNCTION__, VLAN_MARKER_VLAN_IF_CREATE, pEntry->Name));
         }
         else
         {

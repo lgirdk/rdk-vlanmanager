@@ -37,7 +37,7 @@
 #define  _VLAN_INTERNAL_H
 
 #include "vlan_mgr_apis.h"
-
+#include "vlan_apis.h"
 /***********************************
     Actual definition declaration
 ************************************/
@@ -59,6 +59,8 @@
     UCHAR                           AliasOfPortMapping[64];                                 \
     ANSC_HANDLE                     hIrepFolderVLAN;                                         \
     ANSC_HANDLE                     hIrepFolderVLANPt;                                       \
+    ULONG                           ulVlanCfgInstanceNumber;                                 \
+    PDML_VLAN_CFG                   VlanCfg;                                             \
 
 typedef  struct
 _DATAMODEL_VLAN

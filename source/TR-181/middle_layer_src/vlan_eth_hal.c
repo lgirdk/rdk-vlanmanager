@@ -345,7 +345,7 @@ int vlan_eth_hal_deleteInterface(hal_param_t *req_msg)
     {
         if (status)
         {
-            CcspTraceInfo(("%s - %d Delete request for [%s] is successful ", __FUNCTION__, __LINE__, req_msg->name));
+            CcspTraceInfo(("%s - %d Delete request for [%s] is successful \n", __FUNCTION__, __LINE__, req_msg->name));
             rc = RETURN_OK;
         }
         else
