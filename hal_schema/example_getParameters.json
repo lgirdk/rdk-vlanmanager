@@ -1,0 +1,10 @@
+{
+  "module": "ethvlanhal",
+  "version": "0.0.1",  
+  "action": "getParameters",
+  "reqId" : "100001",
+  "params":
+  [
+    {"name":"Device.Ethernet.Link.1.Stats."} 
+  ]
+}
