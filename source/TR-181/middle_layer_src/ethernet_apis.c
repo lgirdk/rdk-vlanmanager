@@ -116,6 +116,7 @@ extern  ANSC_HANDLE                       bus_handle;
 static ANSC_STATUS DmlEthSetParamValues(const char *pComponent, const char *pBus, const char *pParamName, const char *pParamVal, enum dataType_e type, unsigned int bCommitFlag);
 static ANSC_STATUS DmlEthGetParamNames(char *pComponent, char *pBus, char *pParamName, char a2cReturnVal[][256], int *pReturnSize);
 static ANSC_STATUS DmlEthGetLowerLayersInstance(char *pLowerLayers, INT *piInstanceNumber);
+static ANSC_STATUS DmlEthSendWanStatusForOtherManagers(char *ifname, char *WanStatus);
 static ANSC_STATUS DmlCreateVlanLink(PDML_ETHERNET pEntry);
 static ANSC_STATUS DmlEthGetParamValues(char *pComponent, char *pBus, char *pParamName, char *pReturnVal);
 static ANSC_STATUS DmlEthDeleteVlanLink(PDML_ETHERNET pEntry);
@@ -132,7 +133,6 @@ static ANSC_STATUS DmlEthCreateMarkingTable(PVLAN_REFRESH_CFG pstRefreshCfg);
 static int DmlEthSyseventInit( void );
 static int DmlGetDeviceMAC( char *pMACOutput, int iMACLength );
 static ANSC_STATUS DmlUpdateEthWanMAC( void );
-static ANSC_STATUS DmlEthSetWanLinkStatusForWanAgent(char *ifname, char *status);
 static ANSC_STATUS DmlDeleteUnTaggedVlanLink(const CHAR *ifName, const PDML_ETHERNET pEntry);
 static ANSC_STATUS DmlCreateUnTaggedVlanLink(const CHAR *ifName, const PDML_ETHERNET pEntry);
 static ANSC_STATUS DmlEthCheckIfaceConfiguredAsPPPoE( char *ifname, BOOL *isPppoeIface);
@@ -505,10 +505,6 @@ DmlDeleteEthInterface
         else
         {
             CcspTraceInfo(("[%s-%d] Successfully deleted Untagged VLAN interface \n", __FUNCTION__, __LINE__));
-            /**
-             * @note Notify LinkStatus to WanAgent.
-             */
-            DmlEthSetWanLinkStatusForWanAgent(intf_name, "Down");
         }
     }
 
@@ -940,7 +936,7 @@ ANSC_STATUS DmlEthDeleteVlanLink(PDML_ETHERNET pEntry)
 
 EXIT:
     /* Notify WanStatus to down for Base Manager. */
-    DmlEthSetWanStatusForBaseManager(iface_alias, "Down");
+    DmlEthSendWanStatusForOtherManagers(iface_alias, "Down");
     return ret;
 }
 
@@ -1384,6 +1380,7 @@ ANSC_STATUS DmlEthSetWanStatusForBaseManager(char *ifname, char *WanStatus)
        CcspTraceInfo(("%s - %s:WANOE ETH Link Instance:%d\n", __FUNCTION__, ETH_MARKER_NOTIFY_WAN_BASE, iWANInstance));
 
        //Set WAN Status
+       
        snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, ETH_STATUS_PARAM_NAME, iWANInstance);
        DmlEthSetParamValues(ETH_COMPONENT_NAME, ETH_DBUS_PATH, acSetParamName, WanStatus, ccsp_string, TRUE);
     }
@@ -1409,6 +1406,56 @@ ANSC_STATUS DmlEthSetWanStatusForBaseManager(char *ifname, char *WanStatus)
     CcspTraceInfo(("%s - %s:Successfully notified %s event to base WAN interface for %s interface \n", __FUNCTION__, ETH_MARKER_NOTIFY_WAN_BASE, WanStatus, ifname));
 
     return ANSC_STATUS_SUCCESS;
+}
+
+/* Set wan status event to WAN Manager */
+ANSC_STATUS DmlEthSetWanStatusForWanManager(char *ifname, char *WanStatus)
+{
+    char acSetParamName[DATAMODEL_PARAM_LENGTH] = {0};
+    INT iWANInstance = -1;
+    INT iIsDSLInterface = 0;
+    INT iIsWANOEInterface = 0;
+
+    //Validate buffer
+    if ((NULL == ifname) || (NULL == WanStatus))
+    {
+        CcspTraceError(("%s Invalid Memory\n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+    
+    //Get Instance for corresponding name
+    DmlEthGetLowerLayersInstanceFromWanManager(ifname, &iWANInstance);
+
+    //Index is not present. so no need to do anything any WAN instance
+    if (-1 == iWANInstance)
+    {
+      CcspTraceError(("%s %d Interface instance not present\n", __FUNCTION__, __LINE__));
+      return ANSC_STATUS_FAILURE;
+    }
+
+
+    //Set WAN LinkStatus
+    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, WAN_IF_LINK_STATUS, iWANInstance);
+    DmlEthSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName, WanStatus, ccsp_string, TRUE);
+    
+
+    CcspTraceInfo(("%s - %s:Successfully notified %s event to WAN Manager for %s interface \n", __FUNCTION__, ETH_MARKER_NOTIFY_WAN_BASE, WanStatus, ifname));
+
+    return ANSC_STATUS_SUCCESS;
+}
+
+
+static ANSC_STATUS DmlEthSendWanStatusForOtherManagers(char *ifname, char *WanStatus)
+{
+    ANSC_STATUS ret = ANSC_STATUS_SUCCESS;
+    
+    ret = DmlEthSetWanStatusForBaseManager(ifname, WanStatus);
+    if(ret == ANSC_STATUS_SUCCESS)
+    {
+        ret = DmlEthSetWanStatusForWanManager(ifname, WanStatus);
+    }
+    
+    return ret;
 }
 
 static ANSC_STATUS
@@ -1491,37 +1538,6 @@ static ANSC_STATUS DmlEthSetWanManagerWanIfaceName(char *ifname, char *vlanifnam
     return ANSC_STATUS_SUCCESS;
 }
 
-/* Set LinkStatus to Device.X_RDK-Central_COM_WanAgent.Interface.{i}.Wan.LinkStatus */
-static ANSC_STATUS DmlEthSetWanLinkStatusForWanAgent(char *ifname, char *status)
-{
-    char acSetParamName[256] = {0};
-    INT iWANInstance = -1;
-
-    //Validate buffer
-    if ((NULL == ifname) || (NULL == status))
-    {
-        CcspTraceError(("%s Invalid Memory\n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-     //Get Instance for corresponding name
-    DmlEthGetLowerLayersInstanceFromWanManager(ifname, &iWANInstance);
-
-    //Index is not present. so no need to do anything any WAN instance
-    if (-1 == iWANInstance)
-    {
-        CcspTraceError(("%s %d Eth instance not present\n", __FUNCTION__, __LINE__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    //Set WAN LinkStatus field
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, WAN_IF_LINK_STATUS, iWANInstance);
-    DmlEthSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName, status, ccsp_string, TRUE);
-
-    CcspTraceInfo(("%s - %s:Successfully assigned %s link status to WAN Agent for %s interface\n", __FUNCTION__, ETH_MARKER_NOTIFY_WAN_BASE, status, ifname));
-    return ANSC_STATUS_SUCCESS;
-}
-
 /* VLAN Refresh Thread */
 static void* DmlEthHandleVlanRefreshThread( void *arg )
 {
@@ -1548,6 +1564,7 @@ static void* DmlEthHandleVlanRefreshThread( void *arg )
     pthread_detach(pthread_self());
 
     iWANInstance = pstRefreshCfg->iWANInstance;
+    
 
     //Get Marking entries
     memset(acGetParamName, 0, sizeof(acGetParamName));
@@ -1660,26 +1677,26 @@ static void* DmlEthHandleVlanRefreshThread( void *arg )
     sleep(2);
 
     //Get status of VLAN link
-    if ( VLAN_REFRESH_CALLED_FROM_VLANCREATION == pstRefreshCfg->enRefreshCaller )
+    while(iIterator < 10)
     {
-        while(iIterator < 10)
+        
+        if (ANSC_STATUS_FAILURE == getInterfaceStatus(pstRefreshCfg->stVlanCfg.L3Interface, &status))
         {
-            if (ANSC_STATUS_FAILURE == getInterfaceStatus(pstRefreshCfg->stVlanCfg.L3Interface, &status))
-            {
-                CcspTraceError(("[%s][%d] getInterfaceStatus failed for %s !! \n", __FUNCTION__, __LINE__, pstRefreshCfg->stVlanCfg.L3Interface));
-                return ANSC_STATUS_FAILURE;
-            }
-            if (status == VLAN_IF_UP)
-            {
-                //Needs to inform base interface is UP after vlan refresh
-                DmlEthSetWanStatusForBaseManager(pstRefreshCfg->WANIfName, "Up");
-                break;
-            }
-
-            iIterator++;
-            sleep(2);
+            CcspTraceError(("[%s][%d] getInterfaceStatus failed for %s !! \n", __FUNCTION__, __LINE__, pstRefreshCfg->stVlanCfg.L3Interface));
+            return ANSC_STATUS_FAILURE;
         }
+        if (status == VLAN_IF_UP)
+        {
+            //Needs to inform base interface is UP after vlan refresh
+            
+            DmlEthSendWanStatusForOtherManagers(pstRefreshCfg->WANIfName, "Up");
+            break;
+        }
+
+        iIterator++;
+        sleep(2);
     }
+    
 
     CcspTraceInfo(("%s - %s:Successfully refreshed VLAN WAN interface(%s)\n", __FUNCTION__, ETH_MARKER_VLAN_REFRESH, pstRefreshCfg->WANIfName));
 
@@ -2033,7 +2050,7 @@ static ANSC_STATUS DmlDeleteUnTaggedVlanLink(const CHAR *ifName, const PDML_ETHE
             /**
              * @note Notify WanStatus to Base Agent.
              */
-             DmlEthSetWanStatusForBaseManager(pEntry->Alias, "Down");
+             DmlEthSendWanStatusForOtherManagers(pEntry->Alias, "Down");
         }
     }
     return returnStatus;
