@@ -95,6 +95,8 @@
 #define WAN_IF_NAME_PARAM_NAME            "Device.X_RDK_WanManager.CPEInterface.%d.Name"
 #define WAN_IF_LINK_STATUS                "Device.X_RDK_WanManager.CPEInterface.%d.Wan.LinkStatus"
 #define WAN_IF_STATUS_PARAM_NAME          "Device.X_RDK_WanManager.CPEInterface.%d.Wan.Status"
+#define WAN_IF_PPP_ENABLE_PARAM           "Device.X_RDK_WanManager.CPEInterface.%d.PPP.Enable"
+#define WAN_IF_PPP_LINKTYPE_PARAM         "Device.X_RDK_WanManager.CPEInterface.%d.PPP.LinkType"
 
 #define WAN_MARKING_NOE_PARAM_NAME        "Device.X_RDK_WanManager.CPEInterface.%d.MarkingNumberOfEntries"
 #define WAN_MARKING_TABLE_NAME            "Device.X_RDK_WanManager.CPEInterface.%d.Marking."
@@ -133,6 +135,7 @@ static ANSC_STATUS DmlUpdateEthWanMAC( void );
 static ANSC_STATUS DmlEthSetWanLinkStatusForWanAgent(char *ifname, char *status);
 static ANSC_STATUS DmlDeleteUnTaggedVlanLink(const CHAR *ifName, const PDML_ETHERNET pEntry);
 static ANSC_STATUS DmlCreateUnTaggedVlanLink(const CHAR *ifName, const PDML_ETHERNET pEntry);
+static ANSC_STATUS DmlEthCheckIfaceConfiguredAsPPPoE( char *ifname, BOOL *isPppoeIface);
 /* *************************************************************************************************** */
 
 ANSC_STATUS
@@ -695,6 +698,8 @@ static ANSC_STATUS DmlCreateVlanLink( PDML_ETHERNET pEntry )
     INT TPId = 0;
     PDATAMODEL_VLAN    pVLAN    = (PDATAMODEL_VLAN)g_pBEManager->hVLAN;
     PDML_VLAN_CFG      pVlanCfg = NULL;
+    BOOL isPppoeIface = FALSE;
+    char VLANInterfaceName[64];
 
     if (NULL == pEntry)
     {
@@ -746,6 +751,21 @@ static ANSC_STATUS DmlCreateVlanLink( PDML_ETHERNET pEntry )
     }
 
     DmlEthGetLowerLayersInstance(pEntry->Path, &iVLANInstance);
+
+    if (ANSC_STATUS_SUCCESS != DmlEthCheckIfaceConfiguredAsPPPoE(pEntry->Alias, &isPppoeIface))
+    {
+        CcspTraceError(("%s - DmlEthCheckIfaceConfiguredAsPPPoE() failed \n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    if (isPppoeIface)
+    {
+        snprintf(VLANInterfaceName, sizeof(VLANInterfaceName), "vlan%d", VlanId);
+    }
+    else
+    {
+        snprintf(VLANInterfaceName, sizeof(VLANInterfaceName), "%s", WAN_INTERFACE_NAME);
+    }
 
     //Create VLAN Link.
     if (-1 == iVLANInstance)
@@ -810,7 +830,7 @@ static ANSC_STATUS DmlCreateVlanLink( PDML_ETHERNET pEntry )
 
     //Set VLAN Inetrfacename.
     snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, VLAN_TERMINATION_PARAM_L3NAME, iVLANInstance);
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", WAN_INTERFACE_NAME);
+    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", VLANInterfaceName);
     if (ANSC_STATUS_SUCCESS != DmlEthSetParamValues(VLAN_COMPONENT_NAME, VLAN_DBUS_PATH, acSetParamName, acSetParamValue, ccsp_string, FALSE))
     {
         CcspTraceError(("%s - Failed to set [%s]\n", __FUNCTION__, VLAN_TERMINATION_PARAM_L3NAME, iVLANInstance));
@@ -2068,10 +2088,79 @@ static ANSC_STATUS DmlCreateUnTaggedVlanLink(const CHAR *ifName, const PDML_ETHE
      */
     DmlEthSetWanManagerWanIfaceName(pEntry->Alias, ifName);
 
-    /**
-     * @note Set LinkStatus for WAN interface
-     */
-    DmlEthSetWanLinkStatusForWanAgent(pEntry->Alias, "Up");
+    return ANSC_STATUS_SUCCESS;
+}
 
+/**
+ * @note API to check the given interface is configured to use as a PPPoE interface
+*/
+static ANSC_STATUS DmlEthCheckIfaceConfiguredAsPPPoE( char *ifname, BOOL *isPppoeIface)
+{
+    char acTmpReturnValue[DATAMODEL_PARAM_LENGTH] = {0};
+    INT iLoopCount, iTotalNoofEntries;
+    char *endPtr = NULL;
+
+    *isPppoeIface = FALSE;
+
+    if (ANSC_STATUS_FAILURE == DmlEthGetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, WAN_NOE_PARAM_NAME, acTmpReturnValue))
+    {
+        CcspTraceError(("[%s][%d]Failed to get param value\n", __FUNCTION__, __LINE__));
+        return ANSC_STATUS_FAILURE;
+    }
+    //Total interface count
+    iTotalNoofEntries = strtol(acTmpReturnValue, &endPtr, 10);
+    if(*endPtr)
+    {
+        CcspTraceError(("Unable to convert '%s' to base 10", acTmpReturnValue ));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    if (0 >= iTotalNoofEntries)
+    {
+        return ANSC_STATUS_SUCCESS;
+    }
+
+    //Traverse table
+    for (iLoopCount = 0; iLoopCount < iTotalNoofEntries; iLoopCount++)
+    {
+        char acTmpQueryParam[DATAMODEL_PARAM_LENGTH] = {0};
+        //Query for WAN interface name
+        snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), WAN_IF_NAME_PARAM_NAME, iLoopCount + 1);
+        memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
+        if (ANSC_STATUS_FAILURE == DmlEthGetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acTmpQueryParam, acTmpReturnValue))
+        {
+            CcspTraceError(("[%s][%d] Failed to get param value\n", __FUNCTION__, __LINE__));
+            continue;
+        }
+
+        //Compare WAN interface name
+        if (0 == strcmp(acTmpReturnValue, ifname))
+        {
+            //Query for PPP Enable data model
+            snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), WAN_IF_PPP_ENABLE_PARAM, iLoopCount + 1);
+            memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
+            if (ANSC_STATUS_FAILURE == DmlEthGetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH,
+                                                            acTmpQueryParam, acTmpReturnValue))
+            {
+                CcspTraceError(("[%s][%d] Failed to get param value\n", __FUNCTION__, __LINE__));
+            }
+            if (0 == strcmp(acTmpReturnValue, "true"))
+            {
+                //Query for PPP LinkType data model
+                snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), WAN_IF_PPP_LINKTYPE_PARAM, iLoopCount + 1);
+                memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
+                if (ANSC_STATUS_FAILURE == DmlEthGetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH,
+                                                                acTmpQueryParam, acTmpReturnValue))
+                {
+                    CcspTraceError(("[%s][%d] Failed to get param value\n", __FUNCTION__, __LINE__));
+                }
+                if (0 == strcmp(acTmpReturnValue, "PPPoE"))
+                {
+                    *isPppoeIface = TRUE;
+                }
+            }
+            break;
+        }
+    }
     return ANSC_STATUS_SUCCESS;
 }
