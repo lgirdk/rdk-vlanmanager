@@ -125,6 +125,12 @@
        <syntax>string</syntax>
       <writable>true</writable>
       </parameter>
+      <parameter>
+       <name>X_RDK_BaseInterface</name>
+       <type>string(64)</type>
+       <syntax>string</syntax>
+       <writable>true</writable>
+      </parameter>
        <parameter>
        <name>MACAddress</name>
        <type>string(17)</type>

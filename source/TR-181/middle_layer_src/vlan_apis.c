@@ -410,7 +410,6 @@ DmlDeleteVlanInterface
     ANSC_STATUS returnStatus = ANSC_STATUS_SUCCESS;
     int ret;
     vlan_interface_status_e status;
-    hal_param_t req_param;
 
     if (!pEntry->Enable)
     {
@@ -437,9 +436,7 @@ DmlDeleteVlanInterface
 
         if ( ( status != VLAN_IF_NOTPRESENT ) && ( status != VLAN_IF_ERROR ) )
         {
-            memset(&req_param, 0, sizeof(req_param));
-            snprintf(req_param.name, sizeof(req_param.name), VLAN_ETH_LINK, pEntry->InstanceNumber);
-            returnStatus = vlan_eth_hal_deleteInterface(&req_param);
+            returnStatus = vlan_eth_hal_deleteInterface(pEntry->Name, pEntry->InstanceNumber);
             if ( ANSC_STATUS_SUCCESS != returnStatus )
             {
                 CcspTraceError(("%s - Failed to delete VLAN interface %s\n", __FUNCTION__, pEntry->Name));
@@ -489,13 +486,13 @@ DmlSetVlan
 {
     ANSC_STATUS             returnStatus  = ANSC_STATUS_SUCCESS;
     vlan_configuration_t    vlan_conf;
+    strncpy(vlan_conf.BaseInterface, pEntry->BaseInterface, sizeof(vlan_conf.BaseInterface));
     strncpy(vlan_conf.L3Interface, pEntry->Name, sizeof(vlan_conf.L3Interface));
-    strncpy(vlan_conf.L2Interface, pEntry->BaseInterface, sizeof(vlan_conf.L2Interface));
+    strncpy(vlan_conf.L2Interface, pEntry->Alias, sizeof(vlan_conf.L2Interface));
     vlan_conf.VLANId = pEntry->VLANId;
     vlan_conf.TPId   = pEntry->TPId;
     vlan_conf.IfaceInstanceNumber = pEntry->InstanceNumber;
     vlan_interface_status_e status;
-    hal_param_t req_param;
     INT iIterator = 0;
 
     if (pEntry != NULL) {
@@ -514,9 +511,7 @@ DmlSetVlan
             if ( ( status != VLAN_IF_NOTPRESENT ) && ( status != VLAN_IF_ERROR ) )
             {
                 CcspTraceInfo(("%s %s:VLAN interface(%s) already exists, delete it first\n", __FUNCTION__, VLAN_MARKER_VLAN_IF_CREATE, vlan_conf.L3Interface));
-                memset(&req_param, 0, sizeof(req_param));
-                snprintf(req_param.name, sizeof(req_param.name), VLAN_ETH_LINK, pEntry->InstanceNumber);
-                returnStatus = vlan_eth_hal_deleteInterface(&req_param);
+                returnStatus = vlan_eth_hal_deleteInterface(pEntry->Name, pEntry->InstanceNumber);
                 if (ANSC_STATUS_SUCCESS != returnStatus)
                 {
                     CcspTraceError(("%s - Failed to delete the existing VLAN interface %s\n", __FUNCTION__, vlan_conf.L3Interface));
@@ -545,7 +540,7 @@ DmlSetVlan
                 if (status == VLAN_IF_UP)
                 {
                     //Needs to inform base interface is UP after vlan creation
-                    DmlEthSendWanStatusForBaseManager(pEntry->Alias, "Up");
+                    DmlEthSendWanStatusForBaseManager(pEntry->BaseInterface, "Up");
                     break;
                 }
 

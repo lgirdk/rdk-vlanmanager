@@ -96,6 +96,7 @@
 /* * TR181 DML Params */
 #define VLAN_ETH_LINK          "Device.Ethernet.Link.%d."
 #define VLAN_ETH_LINK_ENABLE   "Device.Ethernet.Link.%d.Enable"
+#define VLAN_ETH_LINK_NAME     "Device.Ethernet.Link.%d.Name"
 #define VLAN_ETH_LINK_STATUS   "Device.Ethernet.Link.%d.Status"
 
 #define VLAN_ETH_TERMINATION_ALIAS "Device.Ethernet.VLANTermination.%d.Alias"
@@ -139,6 +140,7 @@ typedef struct _VLAN_SKB_CONFIG
 typedef struct _vlan_configuration
 {
      unsigned int IfaceInstanceNumber; /* Instance number of interface */
+     char BaseInterface[64]; /* BaseInterface like dsl0, fast0 */
      char L2Interface[64]; /* L2interface like eth3, ptm0 */
      char L3Interface[64]; /* L3 interface like erouter0. */
      int VLANId; /* Vlan Id */
@@ -216,6 +218,6 @@ int vlan_eth_hal_setMarkings(vlan_configuration_t *config);
 * @sideeffect None.
 *
 */
-int vlan_eth_hal_deleteInterface(hal_param_t *req_msg);
+int vlan_eth_hal_deleteInterface(char *ifname, int instanceNumber);
 
 #endif /*__VLAN_ETH_HAL_H__*/

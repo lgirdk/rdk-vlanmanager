@@ -548,6 +548,21 @@ EthLink_GetParamStringValue
         AnscCopyString(pValue, p_EthLink->MACAddress);
         return 0;
     }
+    if( AnscEqualString(ParamName, "X_RDK_BaseInterface", TRUE))
+    {
+        if ( AnscSizeOfString(p_EthLink->BaseInterface) < *pUlSize)
+        {   
+            AnscCopyString(pValue, p_EthLink->BaseInterface);
+            return 0;
+        }
+        else
+        {   
+            *pUlSize = AnscSizeOfString(p_EthLink->BaseInterface)+1;
+            return 1;
+        }
+
+        return 0;
+    }
 
     /* CcspTraceWarning(("Unsupported parameter '%s'\n", ParamName)); */
     return -1;
@@ -634,8 +649,9 @@ EthLink_SetParamBoolValue
             vlan_configuration_t stVlanCfg = { 0 };
 
             stVlanCfg.IfaceInstanceNumber = p_EthLink->InstanceNumber;
-            snprintf( stVlanCfg.L3Interface, sizeof(stVlanCfg.L3Interface), "%s", WAN_INTERFACE_NAME );
-            snprintf( stVlanCfg.L2Interface, sizeof(stVlanCfg.L2Interface), "%s", p_EthLink->Name );
+            snprintf( stVlanCfg.BaseInterface, sizeof(stVlanCfg.BaseInterface), "%s", p_EthLink->BaseInterface );
+            snprintf( stVlanCfg.L3Interface, sizeof(stVlanCfg.L3Interface), "%s", p_EthLink->Name );
+            snprintf( stVlanCfg.L2Interface, sizeof(stVlanCfg.L2Interface), "%s", p_EthLink->Alias );
             int iVlanId = DEFAULT_VLAN_ID;
             if (ANSC_STATUS_SUCCESS != GetVlanId(&iVlanId, p_EthLink))
             {
@@ -765,6 +781,11 @@ EthLink_SetParamStringValue
     if( AnscEqualString(ParamName, "MACAddress", TRUE))
     {
         AnscCopyString(p_EthLink->MACAddress, pString);
+        return TRUE;
+    }
+    if( AnscEqualString(ParamName, "X_RDK_BaseInterface", TRUE))
+    {
+        AnscCopyString(p_EthLink->BaseInterface, pString);
         return TRUE;
     }
 

@@ -325,27 +325,34 @@ int vlan_eth_hal_setMarkings(vlan_configuration_t *config)
 #endif //_HUB4_PRODUCT_REQ_
 
 /* vlan_eth_hal_deleteInterface() */
-int vlan_eth_hal_deleteInterface(hal_param_t *req_msg)
+int vlan_eth_hal_deleteInterface(char *ifname, int instanceNumber)
 {
     int rc = RETURN_OK;
     json_object *jmsg = NULL;
     json_object *jreply_msg = NULL;
     json_bool status = FALSE;
+    hal_param_t param;
 
-    if (NULL == req_msg)
+    if (NULL == ifname)
     {
         CcspTraceError(("Error: Invalid arguement \n"));
         return RETURN_ERR;
     }
 
-    jmsg = json_hal_client_get_request_header(RPC_DELETE_OBJECT_REQUEST);
+    jmsg = json_hal_client_get_request_header(RPC_SET_PARAMETERS_REQUEST);
     CHECK(jmsg);
 
-    if( json_hal_add_param(jmsg, DELETE_REQUEST_MESSAGE, req_msg) != RETURN_OK)
-    {
-        FREE_JSON_OBJECT(jmsg);
-        return RETURN_ERR;
-    }
+    memset(&param, 0, sizeof(param));
+    snprintf(param.name, sizeof(param.name), VLAN_ETH_LINK_ENABLE, instanceNumber);
+    snprintf(param.value, sizeof(param.value), "false");
+    param.type = PARAM_BOOLEAN;
+    json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
+
+    memset(&param, 0, sizeof(param));
+    snprintf(param.name, sizeof(param.name), VLAN_ETH_LINK_NAME, instanceNumber);
+    snprintf(param.value, sizeof(param.value), "%s", ifname);
+    param.type = PARAM_STRING;
+    json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
 
     CcspTraceInfo(("JSON Request message = %s \n", json_object_to_json_string_ext(jmsg, JSON_C_TO_STRING_PRETTY)));
 
@@ -362,12 +369,12 @@ int vlan_eth_hal_deleteInterface(hal_param_t *req_msg)
     {
         if (status)
         {
-            CcspTraceInfo(("%s - %d Delete request for [%s] is successful \n", __FUNCTION__, __LINE__, req_msg->name));
+            CcspTraceInfo(("%s - %d Delete request for [%s] is successful \n", __FUNCTION__, __LINE__, ifname));
             rc = RETURN_OK;
         }
         else
         {
-            CcspTraceError(("%s - %d - Delete request for [%s] is failed \n", __FUNCTION__, __LINE__, req_msg->name));
+            CcspTraceError(("%s - %d - Delete request for [%s] is failed \n", __FUNCTION__, __LINE__, ifname));
             rc = RETURN_ERR;
         }
     }

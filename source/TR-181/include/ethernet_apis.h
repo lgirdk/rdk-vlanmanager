@@ -51,7 +51,6 @@
 #define DSL_IFC_STR                      "dsl"
 #define DEFAULT_VLAN_ID                  (-1)
 #endif
-#define WAN_INTERFACE_NAME              "erouter0"
 
 /* * Telemetry Markers */
 #define ETH_MARKER_VLAN_IF_CREATE          "RDKB_VLAN_CREATE"
@@ -101,6 +100,7 @@ _DML_ETHERNET
     ethernet_link_status_e   Status;
     CHAR                 Alias[64];
     CHAR                 Name[64];
+    CHAR                 BaseInterface[64];
     CHAR                 Path[128];
     UINT                 LastChange;
     CHAR                 LowerLayers[1024];
