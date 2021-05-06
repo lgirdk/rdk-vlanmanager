@@ -1,0 +1,14 @@
+{
+  "module": "vlanhal",
+  "version": "0.0.1",  
+  "action": "setParameters",
+  "reqId" : "100001",
+  "params":
+  [
+    {"name":"Device.Ethernet.VLANTermination.1.Enable", "type":"boolean", "value":true},
+    {"name":"Device.Ethernet.VLANTermination.1.Alias", "type":"string", "value":"ptm0"},
+    {"name":"Device.Ethernet.VLANTermination.1.Name", "type":"string", "value":"erouter0"},
+    {"name":"Device.Ethernet.VLANTermination.1.VLANID", "type":"unsignedInt", "value":101},
+    {"name":"Device.Ethernet.VLANTermination.1.TPID", "type":"unsignedInt", "value":33024}        
+  ]
+}

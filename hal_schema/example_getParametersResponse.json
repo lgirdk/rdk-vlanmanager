@@ -1,0 +1,24 @@
+{
+  "module": "ethvlanhal",
+  "version": "0.0.1",  
+  "action": "getParametersResponse",
+  "reqId" : "100001",
+  "params":
+  [
+    {"name":"Device.Ethernet.Link.1.Stats.BytesSent","type":"unsignedLong","value":124690},
+    {"name":"Device.Ethernet.Link.1.Stats.BytesReceived","type":"unsignedLong","value":124690},
+    {"name":"Device.Ethernet.Link.1.Stats.PacketsSent","type":"unsignedLong","value":124690},
+    {"name":"Device.Ethernet.Link.1.Stats.PacketsReceived","type":"unsignedLong","value":124690},
+    {"name":"Device.Ethernet.Link.1.Stats.ErrorsSent","type":"unsignedInt","value":124690},
+    {"name":"Device.Ethernet.Link.1.Stats.ErrorsReceived","type":"unsignedInt","value":124690}, 
+    {"name":"Device.Ethernet.Link.1.Stats.UnicastPacketsSent","type":"unsignedLong","value":124690},
+    {"name":"Device.Ethernet.Link.1.Stats.UnicastPacketsReceived","type":"unsignedLong","value":124690},
+    {"name":"Device.Ethernet.Link.1.Stats.DiscardPacketsSent","type":"unsignedInt","value":124690},
+    {"name":"Device.Ethernet.Link.1.Stats.DiscardPacketsReceived","type":"unsignedInt","value":124690}, 
+    {"name":"Device.Ethernet.Link.1.Stats.MulticastPacketsSent","type":"unsignedLong","value":124690},
+    {"name":"Device.Ethernet.Link.1.Stats.MulticastPacketsReceived","type":"unsignedLong","value":124690},
+    {"name":"Device.Ethernet.Link.1.Stats.BroadcastPacketsSent","type":"unsignedLong","value":124690},
+    {"name":"Device.Ethernet.Link.1.Stats.BroadcastPacketsReceived","type":"unsignedLong","value":124690},
+    {"name":"Device.Ethernet.Link.1.Stats.UnknownProtoPacketsReceived","type":"unsignedInt","value":124690}
+  ]
+}

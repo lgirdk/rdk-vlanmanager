@@ -1,0 +1,943 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gerrit.teamccp.com/rdk/rdkb/components/opensource/ccsp/halinterface/generic/ethvlanterm_json/ethlinkvlanterm_hal_schema.json",
+  "title": "Ethernet Link and VLANTermination HAL Schema",
+  "description": "Ethernet Link and VLANTermination HAL JSON Schema definitions. DO NOT modify the contents of this schema file. RDK community team make necessary changes and release",
+
+  "definitions": {
+
+    "schemaVersion" : {
+      "description": "Supported version of the schema. DO NOT modify the value of the version string. HAL operation cannot be performed without correct supported version.",
+      "type": "string",
+      "const": "0.0.1"
+    },
+
+    "moduleName" : {
+        "description": "Module name to be used in JSON message",
+        "type": "string",
+        "const": "ethvlanhal"
+    },
+
+    "action": {
+      "description": "List of action strings that can be used in a JSON message that is exchanged between RDK Manager & Vendor Software.",
+      "type": "string",
+      "enum": [
+        "getSchema",
+        "getParameters",
+        "getParametersResponse",
+        "setParameters",
+        "subscribeEvent",
+        "getActiveSubscriptions",
+        "getActiveSubscriptionsResponse",
+        "getSchemaResponse",
+        "publishEvent",
+        "deleteObject",
+        "result"
+      ]
+    },
+    
+    "getParameters": {
+      "description": "Supported parameters of 'getParameters' action used by RDK Manager JSON HAL client.",
+      "anyOf": [
+        { "$ref": "#/definitions/getParameterSupportedList" },
+        { "$ref": "#/definitions/getParameterOptionalList" }
+      ],
+      "required": [ "name" ]
+    },
+
+    "getParametersResponse": {
+      "description": "Supported parameters of 'getParametersResponse' action used by Vendor Software JSON HAL server",
+      "anyOf": [
+        { "$ref": "#/definitions/getParameterSupportedList" },
+        { "$ref": "#/definitions/getParameterOptionalList" }
+        
+      ],
+      "required": [ "name","type","value" ]
+    }, 
+
+    "getSchema": {
+      "description": "The 'getSchema' action used by RDK Manager JSON HAL client. This action doesn't have any params list."
+    },
+
+    "getSchemaResponse": {
+      "description": "Properties of 'getSchemaResponse' action used by Vendor software JSON HAL server.",
+      "type": "object",
+      "properties": {
+        "FilePath": {
+          "type": "string",
+          "pattern": "^(.+)\/([^/]+)$"
+        }
+      },
+      "additionalProperties": false,
+      "required": [ "FilePath" ]
+    },
+
+    "setParameters": {
+      "description": "Supported parameters of 'setParameters' action used by RDK Manager JSON HAL client.",
+      "anyOf": [
+        { "$ref": "#/definitions/setParameterSupportedList" },
+        { "$ref": "#/definitions/setParameterOptionalList" }        
+      ],
+      "required": [ "name", "type", "value" ]
+    },
+
+    "result": {
+      "type": "object",
+      "properties": {
+        "Status": { "$ref": "#/definitions/resultStatusEnumList" }
+      },
+      "additionalProperties": false,
+      "required": [ "Status" ]
+    },
+
+    "subscribeEvent": {
+      "description": "RDK Manager uses this action to subscribe any event that it wants to receive from the Vendor Software",
+      "anyOf": [
+        { "$ref": "#/definitions/subscribeEventSupportedList" }
+      ],
+      "required": [ "name", "notificationType" ]
+    },
+
+    "publishEvent": {
+      "description": "Vendor Software uses this action to publish events that are subscribed by the RDK Manager",
+      "anyOf": [
+          { "$ref": "#/definitions/subscribeEventSupportedList" }
+      ],      
+      "required": [ "name", "value" ]
+    },
+
+    "deleteObject": {
+      "anyOf": [
+        { "$ref": "#/definitions/ethVLANTerminationName" }
+      ],
+      "required": [ "name" ]
+    },
+
+    "notificationType": {
+      "type": "string",
+      "enum": [
+        "interval",
+        "onChange"
+      ],
+      "default": "onChange"
+    },
+
+    "resultStatusEnumList": {
+      "description": "Result string for any action that is requested",
+      "type": "string",
+      "enum": [
+        "Success",
+        "Failed",
+        "Invalid Argument",
+        "Not Supported"
+      ],
+      "default": "Success"
+    },
+
+    "subscribeEventSupportedList": {
+      "description": "Supported data model parameter list for subscribeEvent and publishEvent actions",
+      "anyOf": [
+        
+      ]
+    },
+
+    "setParameterSupportedList": {
+      "description": "Supported data model parameter list for setParameters action",
+      "anyOf": [
+        { "$ref": "#/definitions/ethVLANTerminationAlias" },
+        { "$ref": "#/definitions/ethVLANTerminationName" },
+        { "$ref": "#/definitions/ethVLANTerminationVLANID" },
+        { "$ref": "#/definitions/ethVLANTerminationTPID" },
+        { "$ref": "#/definitions/ethLinkAlias" },
+        { "$ref": "#/definitions/ethLinkName" },
+        { "$ref": "#/definitions/ethLinkEnable" },
+        { "$ref": "#/definitions/ethLinkPriorityTagging" }
+
+      ]
+    },
+
+    "setParameterOptionalList": {
+      "description": "Optional data model parameter list for setParameters action",
+      "anyOf": [
+        { "$ref": "#/definitions/ethVLANTerminationEnable" },
+        { "$ref": "#/definitions/xrdkMarkingSKBPort" },
+        { "$ref": "#/definitions/xrdkMarkingEthernetPriorityMark" }
+      ]
+    },
+
+    "getParameterSupportedList": {
+      "description": "Supported data model parameter list for getParameters action",
+      "anyOf": [
+        { "$ref": "#/definitions/ethLinkObjectName" },
+        { "$ref": "#/definitions/ethLinkEnable" },
+        { "$ref": "#/definitions/ethLinkStatus" },
+        { "$ref": "#/definitions/ethLinkAlias" },
+        { "$ref": "#/definitions/ethLinkName" },
+        { "$ref": "#/definitions/ethLinkMACAddress" },
+        { "$ref": "#/definitions/ethLinkPriorityTagging" }
+
+      ]
+    },
+
+    "getParameterOptionalList": {
+      "description": "Optional data model parameter list for getParameters action",
+      "anyOf": [
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationStatsObjectName" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationStatsBytesSent" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationBytesReceived" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationPacketsSent" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationPacketsReceived" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationErrorsSent" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationErrorsReceived" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationUnicastPacketsSent" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationUnicastPacketsReceived" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationDiscardPacketsSent" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationDiscardPacketsReceived" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationMulticastPacketsSent" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationMulticastPacketsReceived" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationBroadcastPacketsSent" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationBroadcastPacketsReceived" },
+        { "$ref": "#/definitions/ethLinkAndVLANTerminationUnknownProtoPacketsReceived" }
+      ]
+    },
+
+
+    "linkStatusEnumList": {
+      "type": "string",
+      "enum": [
+        "Up",
+        "Down",
+        "Unknown",
+        "Dormant",
+        "NotPresent",
+        "LowerLayerDown",
+        "Error"
+      ]
+    },
+
+    "ethLinkObjectName": {
+      "description": "Ethernet link layer table",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.Link\\.\\d+\\.$"
+        }
+      }
+    },
+
+    "ethLinkEnable": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.Link\\.\\d+\\.Enable$"          
+        },
+        "type": {
+          "type": "string",
+          "const": "boolean"
+        },
+        "value": { "type": "boolean" }
+      }
+    },
+
+    "ethLinkStatus": {
+      "type": "object",
+      "additionalProperties": false,  
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.Link\\.\\d+\\.Status$"
+        },
+        "type": {
+          "type": "string",
+          "const": "string"
+        },
+        "value": { "$ref": "#/definitions/linkStatusEnumList" }
+      }
+    },
+
+    "ethLinkAlias": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.Link\\.\\d+\\.Alias$"
+        },
+        "type": {
+          "type": "string",
+          "const": "string"
+        },
+        "value": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
+
+    "ethLinkName": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.Link\\.\\d+\\.Name$"
+        },
+        "type": {
+          "type": "string",
+          "const": "string"
+        },
+        "value": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
+
+    "ethLinkMACAddress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.Link\\.\\d+\\.MACAddress$"
+        },
+        "type": {
+          "type": "string",
+          "const": "string"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^([0-9A-Fa-f][0-9A-Fa-f]:){5}([0-9A-Fa-f][0-9A-Fa-f])$",
+          "minLength": 17,
+          "maxLength": 17
+        }
+      }
+    },
+
+    "ethLinkPriorityTagging": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.Link\\.\\d+\\.PriorityTagging$"          
+        },
+        "type": {
+          "type": "string",
+          "const": "boolean"
+        },
+        "value": { "type": "boolean" }
+      }
+    },
+
+
+    "ethLinkAndVLANTerminationStatsObjectName": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.$"
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationStatsBytesSent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.BytesSent$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedLong"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationBytesReceived": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.BytesReceived$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedLong"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationPacketsSent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.PacketsSent$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedLong"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationPacketsReceived": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.PacketsReceived$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedLong"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationErrorsSent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.ErrorsSent$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedInt"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationErrorsReceived": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.ErrorsReceived$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedInt"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationUnicastPacketsSent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.UnicastPacketsSent$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedLong"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationUnicastPacketsReceived": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.UnicastPacketsReceived$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedLong"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationDiscardPacketsSent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.DiscardPacketsSent$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedInt"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationDiscardPacketsReceived": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.DiscardPacketsReceived$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedInt"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationMulticastPacketsSent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.MulticastPacketsSent$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedLong"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationMulticastPacketsReceived": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.MulticastPacketsReceived$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedLong"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationBroadcastPacketsSent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.BroadcastPacketsSent$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedLong"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationBroadcastPacketsReceived": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.BroadcastPacketsReceived$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedLong"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethLinkAndVLANTerminationUnknownProtoPacketsReceived": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.(Link|VLANTermination)\\.\\d+\\.Stats\\.UnknownProtoPacketsReceived$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedInt"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "ethVLANTerminationObjectName": {
+      "description": " A VLAN Termination entry is typically stacked on top of a Link object to receive and send frames with the configured VLANID",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.VLANTermination\\.\\d+\\.$"
+        }
+      }
+    },
+
+    "ethVLANTerminationEnable": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.VLANTermination\\.\\d+\\.Enable$"          
+        },
+        "type": {
+          "type": "string",
+          "const": "boolean"
+        },
+        "value": { "type": "boolean" }
+      }
+    },
+
+    "ethVLANTerminationStatus": {
+      "type": "object",
+      "additionalProperties": false,  
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.VLANTermination\\.\\d+\\.Status$"
+        },
+        "type": {
+          "type": "string",
+          "const": "string"
+        },
+        "value": { "$ref": "#/definitions/linkStatusEnumList" }
+      }
+    },
+
+    "ethVLANTerminationAlias": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.VLANTermination\\.\\d+\\.Alias$"
+        },
+        "type": {
+          "type": "string",
+          "const": "string"
+        },
+        "value": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
+
+    "ethVLANTerminationName": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.VLANTermination\\.\\d+\\.Name$"
+        },
+        "type": {
+          "type": "string",
+          "const": "string"
+        },
+        "value": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
+
+    "ethVLANTerminationVLANID": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.VLANTermination\\.\\d+\\.VLANID$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedInt"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4094
+        }
+      }
+    },
+
+    "ethVLANTerminationTPID": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.VLANTermination\\.\\d+\\.TPID$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedInt"
+        },
+        "value": {
+          "type": "integer",
+          "enum":[34984,33024]
+        }
+      }
+    },
+
+    "xrdkMarkingSKBPort": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.Link\\.\\d+\\.X_RDK_Marking\\.\\d+\\.SKBPort$"
+        },
+        "type": {
+          "type": "string",
+          "const": "unsignedInt"
+        },
+        "value": {
+          "type": "integer"
+        }
+      }
+    },
+	   
+    "xrdkMarkingEthernetPriorityMark": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^Device\\.Ethernet\\.Link\\.\\d+\\.X_RDK_Marking\\.\\d+\\.EthernetPriorityMark$"
+        },
+        "type": {
+          "type": "string",
+          "const": "int"
+        },
+        "value": {
+          "type": "integer"
+        }
+      }
+    }
+
+  },
+
+  "type": "object",
+  "required": [
+    "module",
+    "version",
+    "action",
+    "reqId"
+  ],
+  "properties": {
+    "module": {   "$ref": "#/definitions/moduleName"   },
+    "version": {  "$ref": "#/definitions/schemaVersion" },
+    "reqId": {
+      "type": "string",
+      "pattern": "^[0-9]+$"
+    },
+    "action": { "$ref": "#/definitions/action" }
+  },
+
+  "allOf": [
+    {
+      "description": "Conditional block to include data model parameters based on actions",
+      "if": {
+        "properties": { "action": { "const": "setParameters" } }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "type": "array",
+            "uniqueItems": true,
+            "minItems": 1,
+            "items": { "$ref": "#/definitions/setParameters" }
+          }
+        },
+        "required": [ "params" ]
+      }
+    },
+
+    {
+      "if": {
+        "properties": { "action": { "const": "getParameters" } }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "type": "array",
+            "uniqueItems": true,
+            "minItems": 1,
+            "items": { "$ref": "#/definitions/getParameters" }
+          }
+        },
+        "required": [ "params" ]
+      }
+    },
+
+    {
+      "if": {
+        "properties": { "action": { "const": "deleteObject" } }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "type": "array",
+            "uniqueItems": true,
+            "minItems": 1,
+            "items": { "$ref": "#/definitions/deleteObject" }
+          }
+        },
+        "required": [ "params" ]
+      }
+    },
+
+    {
+      "if": {
+        "properties": { "action": { "const": "subscribeEvent" } }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "type": "array",
+            "uniqueItems": true,
+            "minItems": 1,
+            "items": { "$ref": "#/definitions/subscribeEvent" }
+          }
+        },
+        "required": [ "params" ]
+      }
+    },
+
+    {
+      "if": {
+        "properties": { "action": { "const": "publishEvent" } }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "type": "array",
+            "uniqueItems": true,
+            "minItems": 1,
+            "items": { "$ref": "#/definitions/publishEvent" }
+          }
+        },
+        "required": [ "params" ]
+      }
+    },
+
+    {
+      "if": {
+        "properties": { "action": { "const": "result" } }
+      },
+      "then": {
+        "properties": {
+          "Result": {
+            "type": "object",
+            "$ref": "#/definitions/result"
+          }
+        },
+        "required": [ "Result" ]
+      }
+    },
+
+    {
+      "if": {
+        "properties": { "action": { "const": "getSchemaResponse" } }
+      },
+      "then": {
+        "properties": {
+          "SchemaInfo": {
+            "type": "object",
+            "$ref": "#/definitions/getSchemaResponse"
+          }
+        },
+        "required": [ "SchemaInfo" ]
+      }
+    },
+
+    {
+      "if": {
+        "properties": { "action": { "const": "getParametersResponse" } }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "type": "array",
+            "uniqueItems": true,
+            "minItems": 1,
+            "items": { "$ref": "#/definitions/getParametersResponse" }
+          }
+        },
+        "required": [ "params" ]
+      }
+    }
+
+  ]
+
+}
