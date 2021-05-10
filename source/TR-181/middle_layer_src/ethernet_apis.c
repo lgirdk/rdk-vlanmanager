@@ -103,7 +103,6 @@ static ANSC_STATUS DmlEthGetParamValues(char *pComponent, char *pBus, char *pPar
 static ANSC_STATUS DmlEthDeleteVlanLink(PDML_ETHERNET pEntry);
 static BOOL DmlEthCheckVlanTaggedIfaceExists (char* ifName);
 static ANSC_STATUS DmlEthGetLowerLayersInstanceFromEthAgent(char *ifname, INT *piInstanceNumber);
-static ANSC_STATUS DmlEthSetWanManagerWanIfaceName(char *ifname, char *vlanifname);
 static ANSC_STATUS DmlEthGetLowerLayersInstanceFromWanManager(char *ifname, INT *piInstanceNumber);
 static void* DmlEthHandleVlanRefreshThread( void *arg );
 #ifdef _HUB4_PRODUCT_REQ_
@@ -704,9 +703,6 @@ static ANSC_STATUS DmlCreateVlanLink( PDML_ETHERNET pEntry )
     }
 
     CcspTraceInfo(("%s - %s:Successfully created vlan interface %s\n", __FUNCTION__, ETH_MARKER_VLAN_TABLE_CREATE, pEntry->Name));
-
-    //Set actual VLAN interface name for WAN interface
-    DmlEthSetWanManagerWanIfaceName( pEntry->BaseInterface, pEntry->Name);
 
     return ANSC_STATUS_SUCCESS;
 }
@@ -1318,38 +1314,6 @@ DmlEthGetLowerLayersInstanceFromWanManager(
     return ANSC_STATUS_SUCCESS;
 }
 
-/* Set VLAN name to Device.X_RDK_WanManager.CPEInterface.{i}.Wan.Name */
-static ANSC_STATUS DmlEthSetWanManagerWanIfaceName(char *ifname, char *vlanifname)
-{
-    char acSetParamName[DATAMODEL_PARAM_LENGTH] = {0};
-    INT iWANInstance = -1;
-
-    //Validate buffer
-    if ((NULL == ifname) || (NULL == vlanifname))
-    {
-        CcspTraceError(("%s Invalid Memory\n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-     //Get Instance for corresponding name
-    DmlEthGetLowerLayersInstanceFromWanManager(ifname, &iWANInstance);
-
-    //Index is not present. so no need to do anything any WAN instance
-    if (-1 == iWANInstance)
-    {
-        CcspTraceError(("%s %d Eth instance not present\n", __FUNCTION__, __LINE__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    //Set WAN actual interface name like ptm0.101
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, WAN_IF_VLAN_NAME_PARAM, iWANInstance);
-    DmlEthSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName, vlanifname, ccsp_string, TRUE);
-
-    CcspTraceInfo(("%s - %s:Successfully assigned %s vlan ifname to WAN Agent for %s interface\n", __FUNCTION__, ETH_MARKER_NOTIFY_WAN_BASE,vlanifname, ifname));
-
-    return ANSC_STATUS_SUCCESS;
-}
-
 /* VLAN Refresh Thread */
 static void* DmlEthHandleVlanRefreshThread( void *arg )
 {
@@ -1936,12 +1900,6 @@ static ANSC_STATUS DmlCreateUnTaggedVlanLink(const PDML_ETHERNET pEntry)
         CcspTraceError(("[%s][%d]Failed to create VLAN interface \n", __FUNCTION__, __LINE__));
         return returnStatus;
     }
-
-
-    /**
-     * @note Set actual VLAN interface name for WAN interface
-     */
-    DmlEthSetWanManagerWanIfaceName(pEntry->BaseInterface, pEntry->Name);
 
     //Get status of VLAN link
     while(iIterator < 10)
