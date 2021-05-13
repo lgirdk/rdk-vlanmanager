@@ -645,7 +645,7 @@ EthLink_SetParamBoolValue
             stVlanCfg.VLANId = iVlanId;
             stVlanCfg.TPId   = 0;
 
-            DmlEthSetVlanRefresh( p_EthLink->Alias, VLAN_REFRESH_CALLED_FROM_DML, &stVlanCfg );
+            DmlEthSetVlanRefresh( p_EthLink->BaseInterface, VLAN_REFRESH_CALLED_FROM_DML, &stVlanCfg );
         }
 #endif //_HUB4_PRODUCT_REQ_
         return TRUE;
