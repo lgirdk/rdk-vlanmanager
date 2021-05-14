@@ -67,7 +67,6 @@
 /*****************************************************************************
 * PROJECT-SPECIFIC INCLUDE FILES
 *****************************************************************************/
-#include "rpc-cli/rpc_client.h"
 #include "vlan_eth_hal.h"
 #include "json_hal_client.h"
 #include "ansc_platform.h"
