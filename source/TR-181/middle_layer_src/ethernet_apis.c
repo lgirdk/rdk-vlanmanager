@@ -61,20 +61,6 @@
 
 #define DATAMODEL_PARAM_LENGTH 256
 
-//VLAN Agent - VLANTermination
-#define VLAN_DBUS_PATH                             "/com/cisco/spvtg/ccsp/vlanmanager"
-#define VLAN_COMPONENT_NAME                        "eRT.com.cisco.spvtg.ccsp.vlanmanager"
-#define VLAN_TERMINATION_TABLE_NAME                "Device.X_RDK_Ethernet.VLANTermination."
-#define VLAN_TERMINATION_NOE_PARAM_NAME            "Device.X_RDK_Ethernet.VLANTerminationNumberOfEntries"
-#define VLAN_TERMINATION_PARAM_VLANID              "Device.X_RDK_Ethernet.VLANTermination.%d.VLANID"
-#define VLAN_TERMINATION_PARAM_TPID                "Device.X_RDK_Ethernet.VLANTermination.%d.TPID"
-#define VLAN_TERMINATION_PARAM_ALIAS               "Device.X_RDK_Ethernet.VLANTermination.%d.Alias"
-#define VLAN_TERMINATION_PARAM_BASEIFACE           "Device.X_RDK_Ethernet.VLANTermination.%d.X_RDK_BaseInterface"
-#define VLAN_TERMINATION_PARAM_L3NAME              "Device.X_RDK_Ethernet.VLANTermination.%d.Name"
-#define VLAN_TERMINATION_PARAM_LOWERLAYER          "Device.X_RDK_Ethernet.VLANTermination.%d.LowerLayers"
-#define VLAN_TERMINATION_PARAM_ENABLE              "Device.X_RDK_Ethernet.VLANTermination.%d.Enable"
-#define VLAN_TERMINATION_PARAM_STATUS             "Device.X_RDK_Ethernet.VLANTermination.%d.Status"
-
 //ETH Agent.
 #define ETH_DBUS_PATH                     "/com/cisco/spvtg/ccsp/ethagent"
 #define ETH_COMPONENT_NAME                "eRT.com.cisco.spvtg.ccsp.ethagent"
@@ -101,10 +87,6 @@
 #define WAN_MARKING_NOE_PARAM_NAME        "Device.X_RDK_WanManager.CPEInterface.%d.MarkingNumberOfEntries"
 #define WAN_MARKING_TABLE_NAME            "Device.X_RDK_WanManager.CPEInterface.%d.Marking."
 
-
-pthread_mutex_t mDeletionMutex; //Mutex to check the deletion status.
-pthread_mutex_t mUpdationMutex; //Mutex to check the deletion status.
-
 extern void* g_pDslhDmlAgent;
 extern ANSC_HANDLE                        g_MessageBusHandle;
 extern COSAGetSubsystemPrefixProc         g_GetSubsystemPrefix;
@@ -119,9 +101,6 @@ static ANSC_STATUS DmlEthGetLowerLayersInstance(char *pLowerLayers, INT *piInsta
 static ANSC_STATUS DmlCreateVlanLink(PDML_ETHERNET pEntry);
 static ANSC_STATUS DmlEthGetParamValues(char *pComponent, char *pBus, char *pParamName, char *pReturnVal);
 static ANSC_STATUS DmlEthDeleteVlanLink(PDML_ETHERNET pEntry);
-static void *VlanAgent_UntaggedVlanCreationThread(void *arg);
-static void *VlanAgent_DMLUpdationHandlerThread(void *arg);
-static void *VlanAgent_DMLDeletionHandlerThread(void *arg);
 static BOOL DmlEthCheckVlanTaggedIfaceExists (char* ifName);
 static ANSC_STATUS DmlEthGetLowerLayersInstanceFromEthAgent(char *ifname, INT *piInstanceNumber);
 static ANSC_STATUS DmlEthSetWanManagerWanIfaceName(char *ifname, char *vlanifname);
@@ -133,8 +112,8 @@ static ANSC_STATUS DmlEthCreateMarkingTable(vlan_configuration_t* pVlanCfg);
 static int DmlEthSyseventInit( void );
 static int DmlGetDeviceMAC( char *pMACOutput, int iMACLength );
 static ANSC_STATUS DmlUpdateEthWanMAC( void );
-static ANSC_STATUS DmlDeleteUnTaggedVlanLink(const CHAR *ifName, const PDML_ETHERNET pEntry);
-static ANSC_STATUS DmlCreateUnTaggedVlanLink(const CHAR *ifName, const PDML_ETHERNET pEntry);
+static ANSC_STATUS DmlDeleteUnTaggedVlanLink(const PDML_ETHERNET pEntry);
+static ANSC_STATUS DmlCreateUnTaggedVlanLink(const PDML_ETHERNET pEntry);
 /* *************************************************************************************************** */
 
 ANSC_STATUS
@@ -260,9 +239,6 @@ DmlEthInit
     )
 {
     ANSC_STATUS returnStatus = ANSC_STATUS_SUCCESS;
-
-    pthread_mutex_init(&mDeletionMutex, NULL);
-    pthread_mutex_init(&mUpdationMutex, NULL);
 
     // Initialize sysevent
     if ( DmlEthSyseventInit( ) < 0 )
@@ -473,39 +449,30 @@ DmlDeleteEthInterface
 
     if (vlanid >= 0)
     {
-        /*
-         * To check any VLAN tagged interface and to create a new one if not,
-         * we need to start a new thread to check the existence and creation.
-         * Otherwise it resulted in 2 minutes delay to create and execute the
-         * VLAN termination.
-         * To avoid multiple simultaneous execution protect it using mutex.
-         */
-         iErrorCode = pthread_create( &VlanObjDeletionThread, NULL, VlanAgent_DMLDeletionHandlerThread, (void *)pEntry );
-         if ( iErrorCode != 0 )
-         {
-             CcspTraceError(("%s %d - Failed to start deletion handler thread\n",__FUNCTION__, __LINE__));
-             return ANSC_STATUS_FAILURE;
-         }
+        if (ANSC_STATUS_SUCCESS != DmlEthDeleteVlanLink(pEntry))
+        {
+            CcspTraceError(("%s %s:Failed to delete VLANTermination table\n ",__FUNCTION__,ETH_MARKER_VLAN_IF_DELETE));
+            return ANSC_STATUS_FAILURE;
+        }
 
-         return ANSC_STATUS_SUCCESS;
+         CcspTraceInfo(("%s %s:Successfully deleted VLANTermination table\n",__FUNCTION__,ETH_MARKER_VLAN_IF_DELETE));
+        return ANSC_STATUS_SUCCESS;
     }
     else /* Untagged */
     {
-
-        char intf_name[64] = {'\0'};
-        strncpy(intf_name, pEntry->Alias, sizeof(intf_name));
         /**
          * @note Delete Untagged VLAN interface
-         */
-        if (ANSC_STATUS_SUCCESS != DmlDeleteUnTaggedVlanLink(pEntry->Name, pEntry))
+        */
+        if (ANSC_STATUS_SUCCESS != DmlDeleteUnTaggedVlanLink(pEntry))
         {
             CcspTraceError(("[%s-%d] Failed to delete Untagged VLAN interface\n ", __FUNCTION__, __LINE__));
+            return ANSC_STATUS_FAILURE;
         }
         else
         {
             /**
              * @note Notify WanStatus to WAN Manager and Base Manager.
-             */
+            */
             DmlEthSendWanStatusForBaseManager(pEntry->BaseInterface, "Down");
             CcspTraceInfo(("[%s-%d] Successfully deleted Untagged VLAN interface \n", __FUNCTION__, __LINE__));
         }
@@ -577,156 +544,22 @@ DmlSetEthCfg
 
     if (vlanid >= 0)
     {
-        /*
-         * In case of tagged VLAN interface creation, we need to start a new thread
-         * and create VLANTermination Instance. Otherwise, we have noticed a delay
-         * to create and update the VLANTermination instance and its parameters.
-         */
-         iErrorCode = pthread_create(&VlanObjCreationThread, NULL, VlanAgent_DMLUpdationHandlerThread, (void *)pEntry);
-         if (iErrorCode != 0)
-         {
-             CcspTraceError(("%s %d - Failed to start the handler thread\n",__FUNCTION__, __LINE__));
-             return ANSC_STATUS_FAILURE;
-         }
-
-         CcspTraceInfo(("%s %d - Successfully started VLAN creation thread\n",__FUNCTION__, __LINE__));
-         return ANSC_STATUS_SUCCESS;
+        if (ANSC_STATUS_SUCCESS != DmlCreateVlanLink(pEntry))
+        {
+            CcspTraceInfo(("%s - Failed to create VLAN interface(%s)\n",__FUNCTION__, pEntry->Name));
+        }
+        CcspTraceInfo(("%s - Successfully created tagged interface(%s)\n",__FUNCTION__, pEntry->Name));
     }
     else
     {
-        VLAN_CREATION_CONFIG* pVlanCreationCfg = (VLAN_CREATION_CONFIG*)malloc(sizeof(VLAN_CREATION_CONFIG));
-        if( NULL == pVlanCreationCfg )
+        if (ANSC_STATUS_SUCCESS != DmlCreateUnTaggedVlanLink(pEntry))
         {
-            CcspTraceError(("%s %d Failed to allocate memory\n", __FUNCTION__, __LINE__));
-            return ANSC_STATUS_FAILURE;
+            CcspTraceInfo(("%s - Failed to create VLAN interface(%s)\n",__FUNCTION__, pEntry->Name));
         }
-
-        //Assigning WAN params for thread
-        pVlanCreationCfg->pEthEntry = pEntry;
-        snprintf( pVlanCreationCfg->WANIfName, sizeof(pVlanCreationCfg->WANIfName), "%s", pEntry->Name );
-
-        iErrorCode = pthread_create(&VlanObjCreationThread, NULL, VlanAgent_UntaggedVlanCreationThread, (void *)pVlanCreationCfg);
-        if (iErrorCode != 0)
-        {
-            CcspTraceError(("%s %d - Failed to start the handler thread\n",__FUNCTION__, __LINE__));
-            return ANSC_STATUS_FAILURE;
-        }
-
-        CcspTraceInfo(("%s %d - Successfully started VLAN creation thread\n",__FUNCTION__, __LINE__));
+        CcspTraceInfo(("%s - Successfully created untagged interface(%s)\n",__FUNCTION__, pEntry->Name));
     }
 
     return ANSC_STATUS_SUCCESS;
-}
-
-
-/* * VlanAgent_UntaggedVlanCreationThread() */
-static void *VlanAgent_UntaggedVlanCreationThread(void *arg)
-{
-    VLAN_CREATION_CONFIG*    pVlanCreationCfg = (VLAN_CREATION_CONFIG*)arg;
-    ANSC_STATUS              retStatus = ANSC_STATUS_SUCCESS;
-
-    if ( NULL == pVlanCreationCfg )
-    {
-        CcspTraceError(("%s Invalid Argument\n",__FUNCTION__));
-        pthread_exit(NULL);
-    }
-
-    //detach thread from caller stack
-    pthread_detach(pthread_self());
-
-    /**
-     * @note Untagged interface creation.
-     */
-    if (ANSC_STATUS_SUCCESS == DmlCreateUnTaggedVlanLink(pVlanCreationCfg->WANIfName, pVlanCreationCfg->pEthEntry))
-    {
-        CcspTraceInfo(("[%s-%d] %s:Successfully created untagged VLAN interface (%s)\n", __FUNCTION__, __LINE__, ETH_MARKER_VLAN_IF_CREATE, pVlanCreationCfg->WANIfName));
-    }
-    else
-    {
-        CcspTraceInfo(("[%s-%d] - Failed to create untagged VLAN interface(%s)\n", __FUNCTION__, __LINE__, pVlanCreationCfg->WANIfName));
-    }
-
-
-    if(pVlanCreationCfg != NULL)
-    {
-        free(pVlanCreationCfg);
-    }
-
-    //Exit thread.
-    pthread_exit(NULL);
-}
-
-/* * VlanAgent_DMLUpdationHandlerThread() */
-static void *VlanAgent_DMLUpdationHandlerThread( void *arg )
-{
-
-    PDML_ETHERNET    pEntry = (PDML_ETHERNET)arg;
-    INT              ret = 0;
-
-    if ( NULL == pEntry )
-    {
-        CcspTraceError(("%s Invalid Argument\n",__FUNCTION__));
-        pthread_exit(NULL);
-    }
-
-    //detach thread from caller stack
-    pthread_detach(pthread_self());
-
-    pthread_mutex_lock(&mUpdationMutex);
-
-    /*
-     *
-     * Tagged interface creation.
-     * Create VLANTERMINATION instance and update.
-     *
-     */
-    if (ANSC_STATUS_SUCCESS == DmlCreateVlanLink(pEntry))
-    {
-        CcspTraceInfo(("%s - %s:Successfully created VLAN interface(%s)\n",__FUNCTION__,ETH_MARKER_VLAN_IF_CREATE,pEntry->Name));
-    }
-    else
-    {
-        CcspTraceInfo(("%s - Failed to create VLAN interface(%s)\n",__FUNCTION__,pEntry->Name));
-    }
-
-    pthread_mutex_unlock(&mUpdationMutex);
-
-    //Exit thread.
-    pthread_exit(NULL);
-}
-
-/* * VlanAgent_DMLDeletionHandlerThread() */
-static void *VlanAgent_DMLDeletionHandlerThread( void *arg )
-{
-
-    PDML_ETHERNET    pEntry = (PDML_ETHERNET)arg;
-    INT              ret    = 0;
-
-    if ( NULL == pEntry )
-    {
-        CcspTraceError(("%s Invalid Argument\n",__FUNCTION__));
-        pthread_exit(NULL);
-    }
-
-    //detach thread from caller stack
-    pthread_detach(pthread_self());
-
-    pthread_mutex_lock(&mDeletionMutex);
-
-    //Delete VLANTERMINATION INSTANCE.
-    if (ANSC_STATUS_SUCCESS != DmlEthDeleteVlanLink(pEntry))
-    {
-        CcspTraceError(("%s %s:Failed to delete VLANTermination table\n ",__FUNCTION__,ETH_MARKER_VLAN_IF_DELETE));
-    }
-    else
-    {
-        CcspTraceInfo(("%s %s:Successfully deleted VLANTermination table\n",__FUNCTION__,ETH_MARKER_VLAN_IF_DELETE));
-    }
-
-    pthread_mutex_unlock(&mDeletionMutex);
-
-    //Exit thread.
-    pthread_exit(NULL);
 }
 
 /* * DmlCreateVlanLink() */
@@ -743,6 +576,7 @@ static ANSC_STATUS DmlCreateVlanLink( PDML_ETHERNET pEntry )
     INT TPId = 0;
     PDATAMODEL_VLAN    pVLAN    = (PDATAMODEL_VLAN)g_pBEManager->hVLAN;
     PDML_VLAN_CFG      pVlanCfg = NULL;
+    ANSC_HANDLE pNewEntry = NULL;
 
     if (NULL == pEntry)
     {
@@ -780,7 +614,7 @@ static ANSC_STATUS DmlCreateVlanLink( PDML_ETHERNET pEntry )
                     {
                         VlanId = pVlanCfg->VLANId;
                         TPId = pVlanCfg->TPId;
-                        CcspTraceError(("%s VlanCfg found at nIndex[%d] !!!\n",__FUNCTION__, nIndex));
+                        CcspTraceInfo(("%s VlanCfg found at nIndex[%d] !!!\n",__FUNCTION__, nIndex));
                     }
                 }
             }
@@ -797,90 +631,79 @@ static ANSC_STATUS DmlCreateVlanLink( PDML_ETHERNET pEntry )
     if (-1 == iVLANInstance)
     {
         char acTableName[128] = {0};
-        INT iNewTableInstance = -1;
+        pNewEntry = Vlan_AddEntry(NULL, &iVLANInstance);
 
-        sprintf(acTableName, "%s", VLAN_TERMINATION_TABLE_NAME);
-        if (CCSP_SUCCESS != CcspBaseIf_AddTblRow(
-                                bus_handle,
-                                VLAN_COMPONENT_NAME,
-                                VLAN_DBUS_PATH,
-                                0, /* session id */
-                                acTableName,
-                                &iNewTableInstance))
+        if (pNewEntry == NULL)
         {
-           CcspTraceError(("%s Failed to add table %s\n", __FUNCTION__,acTableName));
+           CcspTraceError(("%s Failed to add table \n", __FUNCTION__));
            return ANSC_STATUS_FAILURE;
         }
-
-        //Assign new instance
-        iVLANInstance = iNewTableInstance;
+    }
+    else
+    {
+        CcspTraceError(("%s Interface already exists \n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
     }
 
-    CcspTraceInfo(("%s - %s Instance:%d\n", __FUNCTION__, VLAN_TERMINATION_TABLE_NAME, iVLANInstance));
+    CcspTraceInfo(("%s - Instance:%d\n", __FUNCTION__, iVLANInstance));
 
     //Set VLANID
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, VLAN_TERMINATION_PARAM_VLANID, iVLANInstance);
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%d", VlanId);
-    if (ANSC_STATUS_SUCCESS != DmlEthSetParamValues(VLAN_COMPONENT_NAME, VLAN_DBUS_PATH, acSetParamName, acSetParamValue, ccsp_unsignedInt, FALSE))
+    if (Vlan_SetParamUlongValue(pNewEntry, "VLANID", VlanId) != TRUE)
     {
-        CcspTraceError(("%s - Failed to set [%s]\n", __FUNCTION__, VLAN_TERMINATION_PARAM_VLANID, iVLANInstance));
+        CcspTraceError(("%s - Failed to set VLANID data model\n", __FUNCTION__));
         return ANSC_STATUS_FAILURE;
     }
 
     //Set TPID
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, VLAN_TERMINATION_PARAM_TPID, iVLANInstance);
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%d", TPId);
-    if (ANSC_STATUS_SUCCESS != DmlEthSetParamValues(VLAN_COMPONENT_NAME, VLAN_DBUS_PATH, acSetParamName, acSetParamValue, ccsp_unsignedInt, FALSE))
+    if (Vlan_SetParamUlongValue(pNewEntry, "TPID", TPId) != TRUE)
     {
-        CcspTraceError(("%s - Failed to set [%s]\n", __FUNCTION__, VLAN_TERMINATION_PARAM_TPID, iVLANInstance));
+        CcspTraceError(("%s - Failed to set TPId data model\n", __FUNCTION__));
         return ANSC_STATUS_FAILURE;
     }
 
     //Set BaseInterface.
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, VLAN_TERMINATION_PARAM_BASEIFACE, iVLANInstance);
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", pEntry->BaseInterface);
-    if (ANSC_STATUS_SUCCESS != DmlEthSetParamValues(VLAN_COMPONENT_NAME, VLAN_DBUS_PATH, acSetParamName, acSetParamValue, ccsp_string, FALSE))
+    if (Vlan_SetParamStringValue(pNewEntry, "X_RDK_BaseInterface", pEntry->BaseInterface) != TRUE)
     {
-        CcspTraceError(("%s - Failed to set [%s]\n", __FUNCTION__, VLAN_TERMINATION_PARAM_BASEIFACE, iVLANInstance));
+        CcspTraceError(("%s - Failed to set X_RDK_BaseInterface data model\n", __FUNCTION__));
         return ANSC_STATUS_FAILURE;
     }
 
     //Set Alias
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, VLAN_TERMINATION_PARAM_ALIAS, iVLANInstance);
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", pEntry->Alias);
-    if (ANSC_STATUS_SUCCESS != DmlEthSetParamValues(VLAN_COMPONENT_NAME, VLAN_DBUS_PATH, acSetParamName, acSetParamValue, ccsp_string, FALSE))
+    if (Vlan_SetParamStringValue(pNewEntry, "Alias", pEntry->Alias) != TRUE)
     {
-        CcspTraceError(("%s - Failed to set [%s]\n", __FUNCTION__, VLAN_TERMINATION_PARAM_ALIAS, iVLANInstance));
+        CcspTraceError(("%s - Failed to set Alias data model\n", __FUNCTION__));
         return ANSC_STATUS_FAILURE;
     }
 
     //Set VLAN Inetrfacename.
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, VLAN_TERMINATION_PARAM_L3NAME, iVLANInstance);
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", pEntry->Name);
-    if (ANSC_STATUS_SUCCESS != DmlEthSetParamValues(VLAN_COMPONENT_NAME, VLAN_DBUS_PATH, acSetParamName, acSetParamValue, ccsp_string, FALSE))
+    if (Vlan_SetParamStringValue(pNewEntry, "Name", pEntry->Name) != TRUE)
     {
-        CcspTraceError(("%s - Failed to set [%s]\n", __FUNCTION__, VLAN_TERMINATION_PARAM_L3NAME, iVLANInstance));
+        CcspTraceError(("%s - Failed to set Name data model\n", __FUNCTION__));
         return ANSC_STATUS_FAILURE;
     }
 
     //Set lowerlayers.
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, VLAN_TERMINATION_PARAM_LOWERLAYER, iVLANInstance);
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", pEntry->Path);
-    if (ANSC_STATUS_SUCCESS != DmlEthSetParamValues(VLAN_COMPONENT_NAME, VLAN_DBUS_PATH, acSetParamName, acSetParamValue, ccsp_string, FALSE))
+    if (Vlan_SetParamStringValue(pNewEntry, "LowerLayers", pEntry->Path) != TRUE)
     {
-        CcspTraceError(("%s - Failed to set [%s]\n", __FUNCTION__, VLAN_TERMINATION_PARAM_LOWERLAYER, iVLANInstance));
-        return ANSC_STATUS_FAILURE;
-    }
-    //Set Enable.
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, VLAN_TERMINATION_PARAM_ENABLE, iVLANInstance);
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", "true");
-    if (ANSC_STATUS_SUCCESS != DmlEthSetParamValues(VLAN_COMPONENT_NAME, VLAN_DBUS_PATH, acSetParamName, acSetParamValue, ccsp_boolean, TRUE))
-    {
-        CcspTraceError(("%s - Failed to set [%s]\n", __FUNCTION__, VLAN_TERMINATION_PARAM_ENABLE, iVLANInstance));
+        CcspTraceError(("%s - Failed to set LowerLayers data model\n", __FUNCTION__));
         return ANSC_STATUS_FAILURE;
     }
 
-    CcspTraceInfo(("%s - %s:Successfully created %s for vlan interface %s\n", __FUNCTION__, ETH_MARKER_VLAN_TABLE_CREATE, VLAN_TERMINATION_TABLE_NAME, pEntry->Name));
+    //Set Enable.
+    if (Vlan_SetParamBoolValue(pNewEntry, "Enable", TRUE) != TRUE)
+    {
+        CcspTraceError(("%s - Failed to set Enable data model\n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    //Commit
+    if (Vlan_Commit(pNewEntry) != ANSC_STATUS_SUCCESS)
+    {
+        CcspTraceError(("%s - Failed to commit data model changes\n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    CcspTraceInfo(("%s - %s:Successfully created vlan interface %s\n", __FUNCTION__, ETH_MARKER_VLAN_TABLE_CREATE, pEntry->Name));
 
     //Set actual VLAN interface name for WAN interface
     DmlEthSetWanManagerWanIfaceName( pEntry->BaseInterface, pEntry->Name);
@@ -938,30 +761,29 @@ ANSC_STATUS DmlEthDeleteVlanLink(PDML_ETHERNET pEntry)
     }
 
     //Set Enable - False
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, VLAN_TERMINATION_PARAM_ENABLE, iVLANInstance);
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "false");
-    if ( (ret = DmlEthSetParamValues(VLAN_COMPONENT_NAME, VLAN_DBUS_PATH, acSetParamName, acSetParamValue, ccsp_boolean, TRUE)) != ANSC_STATUS_SUCCESS)
+    UINT uInstanceNumber = 0;
+    ANSC_HANDLE pVlanEntry = Vlan_GetEntry(NULL, (iVLANInstance - 1), &uInstanceNumber);
+    if (pVlanEntry != NULL)
     {
-        CcspTraceInfo(("[%s][%d] Failed to set [%s] , error [%d] \n", __FUNCTION__, __LINE__, VLAN_TERMINATION_PARAM_ENABLE, iVLANInstance, ret));
-        goto EXIT;
+        if (Vlan_SetParamBoolValue(pVlanEntry, "Enable", FALSE) != TRUE)
+        {
+            CcspTraceInfo(("[%s][%d] Failed to set Enable data model to false \n", __FUNCTION__, __LINE__));
+            ret = ANSC_STATUS_FAILURE;
+            goto EXIT;
+        }
+        if (Vlan_Commit(pVlanEntry) != ANSC_STATUS_SUCCESS)
+        {
+            CcspTraceError(("%s - Failed to delete VLAN table instance (%d)\n", __FUNCTION__, uInstanceNumber));
+            ret = ANSC_STATUS_FAILURE;
+            goto EXIT;
+        }
     }
 
-    sleep(1);
-
     //Delete Instance.
-    sprintf(acTableName, "%s%d.", VLAN_TERMINATION_TABLE_NAME, iVLANInstance);
-    int ccsp_ret = CcspBaseIf_DeleteTblRow(
-        bus_handle,
-        VLAN_COMPONENT_NAME,
-        VLAN_DBUS_PATH,
-        0, /* session id */
-        acTableName);
-
-    if (CCSP_SUCCESS != ccsp_ret)
+    if (Vlan_DelEntry(NULL, pVlanEntry) != ANSC_STATUS_SUCCESS)
     {
-        CcspTraceError(("%s - Failed to delete table(%s), error (%d)\n", __FUNCTION__, acTableName, ret));
-        ret = ANSC_STATUS_FAILURE;
-        goto EXIT;
+       ret = ANSC_STATUS_FAILURE;
+       goto EXIT;
     }
 
 EXIT:
@@ -973,61 +795,37 @@ EXIT:
 /* * DmlEthGetLowerLayersInstance() */
 static ANSC_STATUS DmlEthGetLowerLayersInstance( char *pLowerLayers, INT *piInstanceNumber )
 {
-    char acTmpReturnValue[256] = {0},
-         a2cTmpTableParams[16][256] = {0};
-    INT iLoopCount,
-        iTotalNoofEntries;
-
-    if (ANSC_STATUS_FAILURE == DmlEthGetParamValues(VLAN_COMPONENT_NAME, VLAN_DBUS_PATH, VLAN_TERMINATION_NOE_PARAM_NAME, acTmpReturnValue))
-    {
-        CcspTraceError(("[%s][%d]Failed to get param value\n", __FUNCTION__, __LINE__));
-        return ANSC_STATUS_FAILURE;
-    }
+    char acTmpReturnValue[256] = {0};
+    INT iLoopCount, iTotalNoofEntries;
+    UINT uInstanceNumber = 0;
+    ULONG uSize = 0;
 
     //Total count
-    iTotalNoofEntries = atoi(acTmpReturnValue);
+    iTotalNoofEntries = Vlan_GetEntryCount(NULL);
 
     if (0 >= iTotalNoofEntries)
     {
         return ANSC_STATUS_SUCCESS;
     }
 
-    //Get table names
-    iTotalNoofEntries = 0;
-    if (ANSC_STATUS_FAILURE == DmlEthGetParamNames(VLAN_COMPONENT_NAME, VLAN_DBUS_PATH, VLAN_TERMINATION_TABLE_NAME, a2cTmpTableParams, &iTotalNoofEntries))
-    {
-        CcspTraceError(("[%s][%d] Failed to get param value\n", __FUNCTION__, __LINE__));
-        return ANSC_STATUS_FAILURE;
-    }
-
     //Traverse from loop
     for (iLoopCount = 0; iLoopCount < iTotalNoofEntries; iLoopCount++)
     {
-        char acTmpQueryParam[256] = {0};
-
-        //Query
-        snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), "%sLowerLayers", a2cTmpTableParams[iLoopCount]);
-
-        memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
-        if (ANSC_STATUS_FAILURE == DmlEthGetParamValues(VLAN_COMPONENT_NAME, VLAN_DBUS_PATH, acTmpQueryParam, acTmpReturnValue))
+        //Query for LowerLayers
+        ANSC_HANDLE pVlanEntry = Vlan_GetEntry(NULL, iLoopCount, &uInstanceNumber);
+        if (pVlanEntry != NULL)
         {
-            CcspTraceError(("[%s][%d] Failed to get param value\n", __FUNCTION__, __LINE__));
-            continue;
+            if (Vlan_GetParamStringValue(pVlanEntry, "LowerLayers", acTmpReturnValue, &uSize) == -1)
+            {
+                CcspTraceError(("[%s][%d] Failed to get LowerLayers value\n", __FUNCTION__, __LINE__));
+                continue;
+            }
         }
 
         //Compare lowerlayers
         if (0 == strcmp(acTmpReturnValue, pLowerLayers))
         {
-            char tmpTableParam[256] = {0};
-            const char *last_two;
-
-            //Copy table param
-            snprintf(tmpTableParam, sizeof(tmpTableParam), "%s", a2cTmpTableParams[iLoopCount]);
-
-            //Get last two chareters from return value and cut the instance
-            last_two = &tmpTableParam[strlen(tmpTableParam) - 2];
-
-            *piInstanceNumber = atoi(last_two);
+            *piInstanceNumber = uInstanceNumber;
             break;
         }
     }
@@ -2067,9 +1865,9 @@ ANSC_STATUS GetVlanId(INT *pVlanId, const PDML_ETHERNET pEntry)
  * @note Delete untagged vlan link interface.
  * Check if the interface exists and delete it.
  */
-static ANSC_STATUS DmlDeleteUnTaggedVlanLink(const CHAR *ifName, const PDML_ETHERNET pEntry)
+static ANSC_STATUS DmlDeleteUnTaggedVlanLink(const PDML_ETHERNET pEntry)
 {
-    if (pEntry == NULL || ifName == NULL)
+    if (pEntry == NULL)
     {
         CcspTraceError(("[%s-%d] Invalid parameter error! \n", __FUNCTION__, __LINE__));
         return ANSC_STATUS_BAD_PARAMETER;
@@ -2078,23 +1876,23 @@ static ANSC_STATUS DmlDeleteUnTaggedVlanLink(const CHAR *ifName, const PDML_ETHE
     ANSC_STATUS returnStatus = ANSC_STATUS_SUCCESS;
     vlan_interface_status_e status;
 
-    returnStatus = getInterfaceStatus (ifName, &status);
+    returnStatus = getInterfaceStatus (pEntry->Name, &status);
     if (returnStatus != ANSC_STATUS_SUCCESS )
     {
-        CcspTraceError(("[%s-%d] - %s: Failed to get VLAN interface status\n", __FUNCTION__, __LINE__, ifName));
+        CcspTraceError(("[%s-%d] - %s: Failed to get VLAN interface status\n", __FUNCTION__, __LINE__, pEntry->Name));
         return returnStatus;
     }
 
     if ( ( status != VLAN_IF_NOTPRESENT ) && ( status != VLAN_IF_ERROR ) )
     {
-        returnStatus = vlan_eth_hal_deleteInterface(ifName, pEntry->InstanceNumber);
+        returnStatus = vlan_eth_hal_deleteInterface(pEntry->Name, pEntry->InstanceNumber);
         if (ANSC_STATUS_SUCCESS != returnStatus)
         {
-            CcspTraceError(("[%s-%d] Failed to delete VLAN interface(%s)\n", __FUNCTION__, __LINE__, ifName));
+            CcspTraceError(("[%s-%d] Failed to delete VLAN interface(%s)\n", __FUNCTION__, __LINE__, pEntry->Name));
         }
         else
         {
-            CcspTraceInfo(("[%s-%d]  %s:Successfully deleted this %s VLAN interface \n", __FUNCTION__, __LINE__, ETH_MARKER_VLAN_IF_DELETE, ifName));
+            CcspTraceInfo(("[%s-%d]  %s:Successfully deleted this %s VLAN interface \n", __FUNCTION__, __LINE__, ETH_MARKER_VLAN_IF_DELETE, pEntry->Name));
         }
     }
     return returnStatus;
@@ -2103,12 +1901,12 @@ static ANSC_STATUS DmlDeleteUnTaggedVlanLink(const CHAR *ifName, const PDML_ETHE
 /**
  * @note Create untagged VLAN interface.
  */
-static ANSC_STATUS DmlCreateUnTaggedVlanLink(const CHAR *ifName, const PDML_ETHERNET pEntry)
+static ANSC_STATUS DmlCreateUnTaggedVlanLink(const PDML_ETHERNET pEntry)
 {
     vlan_interface_status_e  status = VLAN_IF_DOWN;
     int iIterator = 0;
 
-    if (pEntry == NULL || ifName == NULL)
+    if (pEntry == NULL )
     {
         CcspTraceError(("[%s-%d] Invalid parameter error! \n", __FUNCTION__, __LINE__));
         return ANSC_STATUS_BAD_PARAMETER;
@@ -2118,7 +1916,7 @@ static ANSC_STATUS DmlCreateUnTaggedVlanLink(const CHAR *ifName, const PDML_ETHE
     /**
      * @note Delete vlan interface if it exists first.
      */
-    DmlDeleteUnTaggedVlanLink(ifName, pEntry);
+    DmlDeleteUnTaggedVlanLink(pEntry);
 
     /**
      * Create untagged vlan interface.
@@ -2143,7 +1941,7 @@ static ANSC_STATUS DmlCreateUnTaggedVlanLink(const CHAR *ifName, const PDML_ETHE
     /**
      * @note Set actual VLAN interface name for WAN interface
      */
-    DmlEthSetWanManagerWanIfaceName(pEntry->BaseInterface, ifName);
+    DmlEthSetWanManagerWanIfaceName(pEntry->BaseInterface, pEntry->Name);
 
     //Get status of VLAN link
     while(iIterator < 10)
