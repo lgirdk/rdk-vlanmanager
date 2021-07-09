@@ -44,6 +44,10 @@
 #include <sysevent/sysevent.h>
 #include "plugin_main_apis.h"
 #include "vlan_internal.h"
+#include "vlan_dml.h"
+
+#include <syscfg.h>
+
 /* **************************************************************************************************** */
 #define SYSEVENT_ETH_WAN_MAC                       "eth_wan_mac"
 
@@ -485,7 +489,7 @@ static BOOL DmlEthCheckVlanTaggedIfaceExists( char *ifName )
     if ( NULL == ifName )
     {
         CcspTraceError(("%s %d - Invalid Memory\n", __FUNCTION__,__LINE__));
-        return ANSC_STATUS_FAILURE;
+        return FALSE;
     }
 
     //Get Instance for corresponding lower layer
@@ -1421,6 +1425,7 @@ ANSC_STATUS VlanManager_SetVlanMarkings( char *ifname, vlan_configuration_t *pVl
 
     CcspTraceInfo(("%s Wan Instance(%d) Marking Entries:%d\n", __FUNCTION__, iWANInstance, iTotalNoofEntries));
 
+#ifdef _HUB4_PRODUCT_REQ_
     //Allocate resource for marking
     pVlanCfg->skbMarkingNumOfEntries = iTotalNoofEntries;
 
@@ -1487,7 +1492,6 @@ ANSC_STATUS VlanManager_SetVlanMarkings( char *ifname, vlan_configuration_t *pVl
                                                                 pVlanCfg->skb_config[iLoopCount].skbEthPriorityMark ));
         }
     }
-#ifdef _HUB4_PRODUCT_REQ_
     //Create and initialise Marking data models
     DmlEthCreateMarkingTable(pVlanCfg);
 

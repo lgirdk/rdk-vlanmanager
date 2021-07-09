@@ -39,6 +39,7 @@
 #include "vlan_apis.h"
 #include "vlan_internal.h"
 #include "plugin_main_apis.h"
+#include "ethernet_apis.h"
 #include "vlan_eth_hal.h"
 
 #ifdef FEATURE_MAPT

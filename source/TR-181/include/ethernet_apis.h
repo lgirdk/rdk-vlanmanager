@@ -47,6 +47,9 @@
 #define ETHERNET_LINK_PATH               "Device.X_RDK_Ethernet.Link."
 #define DSL_IFC_STR                      "dsl"
 #define DEFAULT_VLAN_ID                  (-1)
+#else
+#define ETHERNET_LINK_PATH               "Device.X_RDK_Ethernet.Link."
+#define DEFAULT_VLAN_ID                  (-1)
 #endif
 
 /* * Telemetry Markers */
