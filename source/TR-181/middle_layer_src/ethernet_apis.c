@@ -774,13 +774,13 @@ ANSC_STATUS DmlEthDeleteVlanLink(PDML_ETHERNET pEntry)
             ret = ANSC_STATUS_FAILURE;
             goto EXIT;
         }
-    }
 
-    //Delete Instance.
-    if (Vlan_DelEntry(NULL, pVlanEntry) != ANSC_STATUS_SUCCESS)
-    {
-       ret = ANSC_STATUS_FAILURE;
-       goto EXIT;
+        //Delete Instance.
+        if (Vlan_DelEntry(NULL, pVlanEntry) != ANSC_STATUS_SUCCESS)
+        {
+            ret = ANSC_STATUS_FAILURE;
+            goto EXIT;
+        }
     }
 
 EXIT:
