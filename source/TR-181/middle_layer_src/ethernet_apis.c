@@ -745,7 +745,7 @@ ANSC_STATUS DmlEthDeleteVlanLink(PDML_ETHERNET pEntry)
         CcspTraceError(("[%s][%d]Invalid Memory\n", __FUNCTION__,__LINE__));
         return ANSC_STATUS_FAILURE;
     }
-    strncpy(iface_alias, pEntry->Alias, sizeof(pEntry->Alias));
+    strncpy(iface_alias, pEntry->Alias, sizeof(iface_alias) - 1);
 
     //Get Instance for corresponding lower layer
     DmlEthGetLowerLayersInstance(pEntry->Path, &iVLANInstance);
@@ -1722,7 +1722,8 @@ ANSC_STATUS getInterfaceStatus(const char *iface, vlan_interface_status_e *statu
         return ANSC_STATUS_FAILURE;
     }
 
-    strcpy(intf.ifr_name, iface);
+    memset (&intf, 0, sizeof(struct ifreq));
+    strncpy(intf.ifr_name, iface, sizeof(intf.ifr_name) - 1);
 
     if (ioctl(sfd, SIOCGIFFLAGS, &intf) == -1) {
         *status = VLAN_IF_ERROR;
@@ -1887,9 +1888,9 @@ static ANSC_STATUS DmlCreateUnTaggedVlanLink(const PDML_ETHERNET pEntry)
      * Create untagged vlan interface.
      */
     vlan_configuration_t vlan_conf = {0};
-    strncpy(vlan_conf.BaseInterface, pEntry->BaseInterface, sizeof(vlan_conf.BaseInterface));
-    strncpy(vlan_conf.L3Interface, pEntry->Name, sizeof(vlan_conf.L3Interface));
-    strncpy(vlan_conf.L2Interface, pEntry->Alias, sizeof(vlan_conf.L2Interface));
+    strncpy(vlan_conf.BaseInterface, pEntry->BaseInterface, sizeof(vlan_conf.BaseInterface) - 1);
+    strncpy(vlan_conf.L3Interface, pEntry->Name, sizeof(vlan_conf.L3Interface) - 1);
+    strncpy(vlan_conf.L2Interface, pEntry->Alias, sizeof(vlan_conf.L2Interface) - 1);
     vlan_conf.VLANId = DEFAULT_VLAN_ID; /* Untagged interface */
     vlan_conf.TPId = 0;
 

@@ -146,7 +146,7 @@ void VlanCfgInitialize( ANSC_HANDLE hThisObject)
 
     pMyObject->ulVlanCfgInstanceNumber = vlancfgCount ;
     PDML_VLAN_CFG pVlanCfg = (PDML_VLAN_CFG)AnscAllocateMemory(sizeof(DML_VLAN_CFG)* vlancfgCount);
-    memset(pVlanCfg, 0, sizeof(pVlanCfg));
+    memset(pVlanCfg, 0, sizeof(DML_VLAN_CFG)* vlancfgCount);
 
     for(nIndex = 0; nIndex < vlancfgCount; nIndex++)
     {
@@ -158,7 +158,7 @@ void VlanCfgInitialize( ANSC_HANDLE hThisObject)
         snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_CFG_REGION, nIndex + 1 );
         if (  CCSP_SUCCESS == DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue ) )
         {
-            strcpy(pVlanCfg[nIndex].Region, acPSMValue);
+            strncpy(pVlanCfg[nIndex].Region, acPSMValue, sizeof(pVlanCfg[nIndex].Region) - 1);
         }
 
         /* get cfg interfaceType from psm */

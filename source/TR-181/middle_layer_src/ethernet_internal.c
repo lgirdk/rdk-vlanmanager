@@ -389,7 +389,7 @@ EthGenForTriggerEntry
 
     pEntry->InstanceNumber            = pEthernet->ulPtNextInstanceNumber;
 
-    _ansc_sprintf( pEntry->Path, "%s%d", ETHERNET_LINK_PATH, pEntry->InstanceNumber );
+    snprintf( pEntry->Path, sizeof(pEntry->Path), "%s%d", ETHERNET_LINK_PATH, pEntry->InstanceNumber );
     DML_ETHERNET_INIT(pEntry);
     pEntry->Status = ETHERNET_IF_STATUS_NOT_PRESENT;
 

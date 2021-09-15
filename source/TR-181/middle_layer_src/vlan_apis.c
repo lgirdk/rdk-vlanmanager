@@ -484,9 +484,11 @@ DmlSetVlan
 {
     ANSC_STATUS             returnStatus  = ANSC_STATUS_SUCCESS;
     vlan_configuration_t    vlan_conf;
-    strncpy(vlan_conf.BaseInterface, pEntry->BaseInterface, sizeof(vlan_conf.BaseInterface));
-    strncpy(vlan_conf.L3Interface, pEntry->Name, sizeof(vlan_conf.L3Interface));
-    strncpy(vlan_conf.L2Interface, pEntry->Alias, sizeof(vlan_conf.L2Interface));
+
+    memset (&vlan_conf, 0, sizeof(vlan_configuration_t));
+    strncpy(vlan_conf.BaseInterface, pEntry->BaseInterface, sizeof(vlan_conf.BaseInterface) - 1);
+    strncpy(vlan_conf.L3Interface, pEntry->Name, sizeof(vlan_conf.L3Interface) - 1);
+    strncpy(vlan_conf.L2Interface, pEntry->Alias, sizeof(vlan_conf.L2Interface) - 1);
     vlan_conf.VLANId = pEntry->VLANId;
     vlan_conf.TPId   = pEntry->TPId;
     vlan_conf.IfaceInstanceNumber = pEntry->InstanceNumber;
