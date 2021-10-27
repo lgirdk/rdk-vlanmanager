@@ -310,6 +310,8 @@ Vlan_DelEntry
         AnscFreeMemory(pVlanCxtLink);
     }
 
+    pVLAN->ulPtNextInstanceNumber--;
+
     return returnStatus;
 }
 
