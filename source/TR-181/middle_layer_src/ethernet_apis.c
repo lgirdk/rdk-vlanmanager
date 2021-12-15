@@ -38,6 +38,8 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
+#include <syscfg/syscfg.h>
+
 #include "vlan_mgr_apis.h"
 #include "ethernet_apis.h"
 #include "ethernet_internal.h"
@@ -46,7 +48,6 @@
 #include "vlan_internal.h"
 #include "vlan_dml.h"
 #include "vlan_eth_hal.h"
-#include <syscfg.h>
 
 /* **************************************************************************************************** */
 #define DATAMODEL_PARAM_LENGTH 256
