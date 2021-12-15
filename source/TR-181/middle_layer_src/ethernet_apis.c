@@ -38,6 +38,8 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
+#include <syscfg/syscfg.h>
+
 #include "vlan_mgr_apis.h"
 #include "ethernet_apis.h"
 #include "ethernet_internal.h"
@@ -45,8 +47,6 @@
 #include "plugin_main_apis.h"
 #include "vlan_internal.h"
 #include "vlan_dml.h"
-
-#include <syscfg.h>
 
 /* **************************************************************************************************** */
 #define SYSEVENT_ETH_WAN_MAC                       "eth_wan_mac"
