@@ -49,5 +49,5 @@ VlanManager_DEPENDENCIES = \
 
 VlanManager_CFLAGS = -DFEATURE_SUPPORT_RDKLOG $(DBUS_CFLAGS) $(SYSTEMD_CFLAGS)
 VlanManager_SOURCES = ssp_action.c ssp_messagebus_interface.c ssp_main.c
-VlanManager_LDFLAGS = -lccsp_common -lrdkloggers $(DBUS_LIBS) $(SYSTEMD_LDFLAGS) -lbreakpadwrapper -lsecure_wrapper
+VlanManager_LDFLAGS = -lccsp_common -lrdkloggers -lprivilege $(DBUS_LIBS) $(SYSTEMD_LDFLAGS) -lbreakpadwrapper -lsecure_wrapper
 VlanManager_LDADD = $(VlanManager_DEPENDENCIES)
