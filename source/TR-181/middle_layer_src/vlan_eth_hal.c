@@ -154,25 +154,25 @@ int vlan_eth_hal_createInterface(vlan_configuration_t *config)
     CHECK(jmsg);
 
     memset(&param, 0, sizeof(param));
-    snprintf(param.name, sizeof(param), VLAN_ETH_TERMINATION_ALIAS, config->IfaceInstanceNumber);
+    snprintf(param.name, sizeof(param.name), VLAN_ETH_TERMINATION_ALIAS, config->IfaceInstanceNumber);
     snprintf(param.value, sizeof(param.value), "%s", config->L2Interface);
     param.type = PARAM_STRING;
     json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
 
     memset(&param, 0, sizeof(param));
-    snprintf(param.name, sizeof(param), VLAN_ETH_TERMINATION_NAME, config->IfaceInstanceNumber);
+    snprintf(param.name, sizeof(param.name), VLAN_ETH_TERMINATION_NAME, config->IfaceInstanceNumber);
     snprintf(param.value, sizeof(param.value), "%s", config->L3Interface);
     param.type = PARAM_STRING;
     json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
 
     memset(&param, 0, sizeof(param));
-    snprintf(param.name, sizeof(param), VLAN_ETH_TERMINATION_VLANID, config->IfaceInstanceNumber);
+    snprintf(param.name, sizeof(param.name), VLAN_ETH_TERMINATION_VLANID, config->IfaceInstanceNumber);
     snprintf(param.value, sizeof(param.value), "%d", config->VLANId);
     param.type = PARAM_INTEGER;
     json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
 
     memset(&param, 0, sizeof(param));
-    snprintf(param.name, sizeof(param), VLAN_ETH_TERMINATION_TPID, config->IfaceInstanceNumber);
+    snprintf(param.name, sizeof(param.name), VLAN_ETH_TERMINATION_TPID, config->IfaceInstanceNumber);
     snprintf(param.value, sizeof(param.value), "%d", config->TPId);
     param.type = PARAM_UNSIGNED_INTEGER;
     json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
@@ -180,13 +180,13 @@ int vlan_eth_hal_createInterface(vlan_configuration_t *config)
     for (int i = 0; i < (*config).skbMarkingNumOfEntries; ++i)
     {
         memset(&param, 0, sizeof(param));
-        snprintf(param.name, sizeof(param), WANIF_ETH_MARKING_SKBPORT, config->IfaceInstanceNumber, i+1);
+        snprintf(param.name, sizeof(param.name), WANIF_ETH_MARKING_SKBPORT, config->IfaceInstanceNumber, i+1);
         snprintf(param.value, sizeof(param.value), "%d", config->skb_config[i].skbPort);
         param.type = PARAM_UNSIGNED_INTEGER;
         json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
 
         memset(&param, 0, sizeof(param));
-        snprintf(param.name, sizeof(param), WANIF_ETH_MARKING_PRIORITYMARK, config->IfaceInstanceNumber, i+1);
+        snprintf(param.name, sizeof(param.name), WANIF_ETH_MARKING_PRIORITYMARK, config->IfaceInstanceNumber, i+1);
         snprintf(param.value, sizeof(param.value), "%d", config->skb_config[i].skbEthPriorityMark);
         param.type = PARAM_INTEGER;
         json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
@@ -248,38 +248,38 @@ int vlan_eth_hal_setMarkings(vlan_configuration_t *config)
     CHECK(jmsg);
 
     memset(&param, 0, sizeof(param));
-    snprintf(param.name, sizeof(param), VLAN_ETH_TERMINATION_ALIAS, config->IfaceInstanceNumber);
+    snprintf(param.name, sizeof(param.name), VLAN_ETH_TERMINATION_ALIAS, config->IfaceInstanceNumber);
     snprintf(param.value, sizeof(param.value), "%s", config->L2Interface);
     param.type = PARAM_STRING;
     json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
 
     memset(&param, 0, sizeof(param));
-    snprintf(param.name, sizeof(param), VLAN_ETH_TERMINATION_NAME, config->IfaceInstanceNumber);
+    snprintf(param.name, sizeof(param.name), VLAN_ETH_TERMINATION_NAME, config->IfaceInstanceNumber);
     snprintf(param.value, sizeof(param.value), "%s", config->L3Interface);
     param.type = PARAM_STRING;
     json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
 
     memset(&param, 0, sizeof(param));
-    snprintf(param.name, sizeof(param), VLAN_ETH_TERMINATION_VLANID, config->IfaceInstanceNumber);
+    snprintf(param.name, sizeof(param.name), VLAN_ETH_TERMINATION_VLANID, config->IfaceInstanceNumber);
     snprintf(param.value, sizeof(param.value), "%d", config->VLANId);
     param.type = PARAM_INTEGER;
     json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
 
     memset(&param, 0, sizeof(param));
-    snprintf(param.name, sizeof(param), VLAN_ETH_TERMINATION_TPID, config->IfaceInstanceNumber);
+    snprintf(param.name, sizeof(param.name), VLAN_ETH_TERMINATION_TPID, config->IfaceInstanceNumber);
     snprintf(param.value, sizeof(param.value), "%d", config->TPId);
     param.type = PARAM_UNSIGNED_INTEGER;
     json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
     for (int i = 0; i < (*config).skbMarkingNumOfEntries; ++i)
     {
         memset(&param, 0, sizeof(param));
-        snprintf(param.name, sizeof(param), WANIF_ETH_MARKING_SKBPORT, config->IfaceInstanceNumber, i+1);
+        snprintf(param.name, sizeof(param.name), WANIF_ETH_MARKING_SKBPORT, config->IfaceInstanceNumber, i+1);
         snprintf(param.value, sizeof(param.value), "%d", config->skb_config[i].skbPort);
         param.type = PARAM_UNSIGNED_INTEGER;
         json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
 
         memset(&param, 0, sizeof(param));
-        snprintf(param.name, sizeof(param), WANIF_ETH_MARKING_PRIORITYMARK, config->IfaceInstanceNumber, i+1);
+        snprintf(param.name, sizeof(param.name), WANIF_ETH_MARKING_PRIORITYMARK, config->IfaceInstanceNumber, i+1);
         snprintf(param.value, sizeof(param.value), "%d", config->skb_config[i].skbEthPriorityMark);
         param.type = PARAM_INTEGER;
         json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
