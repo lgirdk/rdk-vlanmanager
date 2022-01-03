@@ -230,12 +230,6 @@ void sig_handler(int sig)
     {
         signal(SIGALRM, sig_handler); /* reset it to this function */
         CcspTraceWarning(("SIGALRM received!\n"));
-        RDKLogEnable = GetLogInfo(bus_handle,"eRT.","Device.LogAgent.X_RDKCENTRAL-COM_LoggerEnable");
-        RDKLogLevel = (char)GetLogInfo(bus_handle,"eRT.","Device.LogAgent.X_RDKCENTRAL-COM_LogLevel");
-        VLANMANAGER_RDKLogLevel = GetLogInfo(bus_handle,"eRT.","Device.LogAgent.X_RDKCENTRAL-COM_VLANManager_LogLevel");
-        VLANMANAGER_RDKLogEnable = (char)GetLogInfo(bus_handle,"eRT.","Device.LogAgent.X_RDKCENTRAL-COM_VLANManager_LoggerEnable");
-        CcspTraceWarning(("RDKLogEnable %d, RDKLogLevel %d, VLANMANAGER_RDKLogLevel %d, VLANMANAGER_RDKLogEnable %d\n",
-                          RDKLogEnable, RDKLogLevel, VLANMANAGER_RDKLogLevel, VLANMANAGER_RDKLogEnable));
     }
     else {
     	/* get stack trace first */
@@ -352,15 +346,6 @@ int main(int argc, char* argv[])
         exit(1);
     }
 
-    //Needs to configure initial logger setup
-    RDKLogEnable = GetLogInfo(bus_handle,"eRT.","Device.LogAgent.X_RDKCENTRAL-COM_LoggerEnable");
-    RDKLogLevel = (char)GetLogInfo(bus_handle,"eRT.","Device.LogAgent.X_RDKCENTRAL-COM_LogLevel");
-    VLANMANAGER_RDKLogLevel = GetLogInfo(bus_handle,"eRT.","Device.LogAgent.X_RDKCENTRAL-COM_VLANManager_LogLevel");
-    VLANMANAGER_RDKLogEnable = (char)GetLogInfo(bus_handle,"eRT.","Device.LogAgent.X_RDKCENTRAL-COM_VLANManager_LoggerEnable");
-
-    CcspTraceInfo(("RDKLogEnable %d, RDKLogLevel %d, VLANMANAGER_RDKLogLevel %d, VLANMANAGER_RDKLogEnable %d\n",
-                          RDKLogEnable, RDKLogLevel, VLANMANAGER_RDKLogLevel, VLANMANAGER_RDKLogEnable));
-	
 #ifdef ENABLE_SD_NOTIFY
     sd_notifyf(0, "READY=1\n"
               "STATUS=vlanmanager is Successfully Initialized\n"
