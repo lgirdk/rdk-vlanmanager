@@ -76,34 +76,9 @@
 #define  ANSC_TRACE_MODULE_ID                       ANSC_TRACE_ID_DM_API
 
 
-#ifdef   _ANSC_ENABLE_PRAGMA_
-#pragma  pack(1)
-#endif
-
-#ifdef  __GNUC__
-
-    #ifndef  _struct_pack_
-    #define  _struct_pack_                          __attribute__ ((__packed__))
-    #endif
-
-#else
-
-    #ifndef  _struct_pack_
-    #define  _struct_pack_
-    #endif
-
-#endif
-
-
 /**********************************************************************
                 STRUCTURE AND CONSTANT DEFINITIONS
 **********************************************************************/
-
-#define  DML_LOWERLAYER_NAME_LENGTH            256
-#define  DML_IF_NAME_LENGTH                    512
-#define  DML_ALIAS_LENGTH                      64
-#define  DML_IP_ADDR_LENGTH                    40   /* IPv4 or IPv6 address */
-#define  DML_MAC_ADDR_LENGTH                   18
 
 typedef  enum
 _DML_IF_STATUS
