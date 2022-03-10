@@ -42,7 +42,7 @@
 
 #define ETHERNET_IF_STATUS_ERROR         7
 #define ETHERNET_IF_STATUS_NOT_PRESENT   5
-#ifdef _HUB4_PRODUCT_REQ_
+#if defined _HUB4_PRODUCT_REQ_ || defined  _DT_WAN_Manager_Enable_
 #define ETHERNET_VLAN_ID                 101
 #define ETHERNET_LINK_PATH               "Device.X_RDK_Ethernet.Link."
 #define DSL_IFC_STR                      "dsl"
@@ -59,6 +59,20 @@
 #define ETH_MARKER_VLAN_TABLE_DELETE       "RDKB_VLAN_TABLE_DELETE"
 #define ETH_MARKER_NOTIFY_WAN_BASE         "RDKB_WAN_NOTIFY"
 #define ETH_MARKER_VLAN_REFRESH            "RDKB_VLAN_REFRESH"
+
+#define CCSP_SUBSYS "eRT."
+#define PSM_VALUE_GET_VALUE(name, str) PSM_Get_Record_Value2(bus_handle, CCSP_SUBSYS, name, NULL, &(str))
+
+#define PSM_ENABLE_STRING_TRUE  "TRUE"
+#define PSM_ENABLE_STRING_FALSE  "FALSE"
+
+#define PSM_ETHLINK_COUNT        "dmsb.ethlink.ifcount"
+#define PSM_ETHLINK_ENABLE       "dmsb.ethlink.%d.Enable"
+#define PSM_ETHLINK_ALIAS        "dmsb.ethlink.%d.alias"
+#define PSM_ETHLINK_NAME         "dmsb.ethlink.%d.name"
+#define PSM_ETHLINK_LOWERLAYERS  "dmsb.ethlink.%d.lowerlayers"
+#define PSM_ETHLINK_MACOFFSET    "dmsb.ethlink.%d.macoffset"
+#define PSM_ETHLINK_BASEIFACE    "dmsb.ethlink.%d.baseiface"
 
 /***********************************
     Actual definition declaration
@@ -104,7 +118,8 @@ _DML_ETHERNET
     CHAR                 Path[128];
     UINT                 LastChange;
     CHAR                 LowerLayers[1024];
-    CHAR                 MACAddress[17];
+    CHAR                 MACAddress[18];
+    ULONG                MACAddrOffSet;
     BOOLEAN              PriorityTagging;
     UINT                 NumberofMarkingEntries;
     PCOSA_DML_MARKING    pstDataModelMarking;
@@ -174,8 +189,7 @@ ANSC_STATUS
 DmlEthInit
     (
         ANSC_HANDLE                 hDml,
-        PANSC_HANDLE                phContext,
-        PFN_DML_ETHERNET_GEN        pValueGenFn
+        PANSC_HANDLE                phContext
     );
 /* APIs for ETHERNET */
 

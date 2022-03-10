@@ -78,13 +78,11 @@
    <objects>
     <object>
      <name>Link</name>
-     <objectType>writableTable</objectType>
+     <objectType>staticTable</objectType>
      <maxInstance>128</maxInstance>
      <functions>
       <func_GetEntryCount>EthLink_GetEntryCount</func_GetEntryCount>
       <func_GetEntry>EthLink_GetEntry</func_GetEntry>
-      <func_AddEntry>EthLink_AddEntry</func_AddEntry>
-      <func_DelEntry>EthLink_DelEntry</func_DelEntry>
       <func_GetParamBoolValue>EthLink_GetParamBoolValue</func_GetParamBoolValue>
       <func_GetParamUlongValue>EthLink_GetParamUlongValue</func_GetParamUlongValue>
       <func_GetParamStringValue>EthLink_GetParamStringValue</func_GetParamStringValue>
@@ -137,6 +135,11 @@
        <syntax>string</syntax>
       </parameter>
       <parameter>
+       <name>MACAddrOffSet</name>
+       <type>unsignedInt</type>
+       <syntax>uint32</syntax>
+      </parameter>
+      <parameter>
        <name>PriorityTagging</name>
        <type>boolean</type>
        <syntax>bool</syntax>
@@ -180,13 +183,11 @@
     </object>
     <object>
      <name>VLANTermination</name>
-     <objectType>writableTable</objectType>
+     <objectType>staticTable</objectType>
      <maxInstance>128</maxInstance>
      <functions>
       <func_GetEntryCount>Vlan_GetEntryCount</func_GetEntryCount>
       <func_GetEntry>Vlan_GetEntry</func_GetEntry>
-      <func_AddEntry>Vlan_AddEntry</func_AddEntry>
-      <func_DelEntry>Vlan_DelEntry</func_DelEntry>
       <func_GetParamBoolValue>Vlan_GetParamBoolValue</func_GetParamBoolValue>
       <func_GetParamIntValue>Vlan_GetParamIntValue</func_GetParamIntValue>
       <func_GetParamUlongValue>Vlan_GetParamUlongValue</func_GetParamUlongValue>

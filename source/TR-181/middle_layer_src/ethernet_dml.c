@@ -79,8 +79,6 @@
 
     *  EthLink_GetEntryCount
     *  EthLink_GetEntry
-    *  EthLink_AddEntry
-    *  EthLink_DelEntry
     *  EthLink_GetParamBoolValue
     *  EthLink_GetParamUlongValue
     *  EthLink_GetParamStringValue
@@ -124,7 +122,15 @@ EthLink_GetEntryCount
 {
     PDATAMODEL_ETHERNET             pEthLink         = (PDATAMODEL_ETHERNET)g_pBEManager->hEth;
 
-    return AnscSListQueryDepth( &pEthLink->Q_EthList );
+    if (pEthLink)
+    {
+        return (pEthLink->ulEthlinkInstanceNumber);
+    }
+    else
+    {
+        return 0;
+    }
+
 
 }
 
@@ -168,147 +174,16 @@ EthLink_GetEntry
     )
 {
     PDATAMODEL_ETHERNET             pMyObject         = (PDATAMODEL_ETHERNET)g_pBEManager->hEth;
-    PSINGLE_LINK_ENTRY              pSListEntry       = NULL;
-    PCONTEXT_LINK_OBJECT            pCxtLink          = NULL;
+    PDML_ETHERNET          pEthlink = NULL;
 
-    pSListEntry       = AnscSListGetEntryByIndex(&pMyObject->Q_EthList, nIndex);
-
-    if ( pSListEntry )
+    if ( pMyObject->EthLink && nIndex < pMyObject->ulEthlinkInstanceNumber )
     {
-        pCxtLink      = ACCESS_CONTEXT_LINK_OBJECT(pSListEntry);
-        *pInsNumber   = pCxtLink->InstanceNumber;
+        pEthlink = pMyObject->EthLink+nIndex;
+        *pInsNumber = pEthlink->InstanceNumber;
+         return pEthlink;
     }
-
-    return (ANSC_HANDLE)pSListEntry;
-}
-
-/**********************************************************************
-
-    caller:     owner of this object
-
-    prototype:
-
-        ANSC_HANDLE
-        EthLink_AddEntry
-            (
-                ANSC_HANDLE                 hInsContext,
-                ULONG*                      pInsNumber
-            );
-
-    description:
-
-        This function is called to add a new entry.
-
-    argument:   ANSC_HANDLE                 hInsContext,
-                The instance handle;
-
-                ULONG*                      pInsNumber
-                The output instance number;
-
-    return:     The handle of new added entry.
-
-**********************************************************************/
-
-ANSC_HANDLE
-EthLink_AddEntry
-    (
-        ANSC_HANDLE                 hInsContext,
-        ULONG*                      pInsNumber
-    )
-{
-    ANSC_STATUS                          returnStatus   = ANSC_STATUS_SUCCESS;
-    PDATAMODEL_ETHERNET                  pEthLink       = (PDATAMODEL_ETHERNET)g_pBEManager->hEth;
-    PDML_ETHERNET                        p_EthLink      = NULL;
-    PCONTEXT_LINK_OBJECT                 pEthCxtLink    = NULL;
-    PSINGLE_LINK_ENTRY                   pSListEntry       = NULL;
-    BOOL                                 bridgeMode;
-
-    p_EthLink = (PDML_ETHERNET)AnscAllocateMemory(sizeof(DML_ETHERNET));
-
-    if ( !p_EthLink )
-    {
-        return NULL;
-    }
-
-    pEthCxtLink = (PCONTEXT_LINK_OBJECT)AnscAllocateMemory(sizeof(CONTEXT_LINK_OBJECT));
-    if ( !pEthCxtLink )
-    {
-        goto EXIT;
-    }
-
-    /* now we have this link content */
-    pEthCxtLink->hContext = (ANSC_HANDLE)p_EthLink;
-    pEthCxtLink->bNew     = TRUE;
-
-    /* Get InstanceNumber and Alias */
-    EthGenForTriggerEntry(NULL, p_EthLink);
-
-    pEthCxtLink->InstanceNumber = p_EthLink->InstanceNumber ;
-    *pInsNumber                 = p_EthLink->InstanceNumber ;
-
-    SEthListPushEntryByInsNum(&pEthLink->Q_EthList, (PCONTEXT_LINK_OBJECT)pEthCxtLink);
-
-    return (ANSC_HANDLE)pEthCxtLink;
-
-EXIT:
-    AnscFreeMemory(p_EthLink);
 
     return NULL;
-}
-
-/**********************************************************************
-
-    caller:     owner of this object
-
-    prototype:
-
-        ULONG
-        EthLink_DelEntry
-            (
-                ANSC_HANDLE                 hInsContext,
-                ANSC_HANDLE                 hInstance
-            );
-
-    description:
-
-        This function is called to delete an exist entry.
-
-    argument:   ANSC_HANDLE                 hInsContext,
-                The instance handle;
-
-                ANSC_HANDLE                 hInstance
-                The exist entry handle;
-
-    return:     The status of the operation.
-
-**********************************************************************/
-
-ULONG
-EthLink_DelEntry
-    (
-        ANSC_HANDLE                 hInsContext,
-        ANSC_HANDLE                 hInstance
-    )
-{
-    ANSC_STATUS               returnStatus      = ANSC_STATUS_SUCCESS;
-    PDATAMODEL_ETHERNET       pEthLink          = (PDATAMODEL_ETHERNET)g_pBEManager->hEth;
-    PCONTEXT_LINK_OBJECT      pEthCxtLink       = (PCONTEXT_LINK_OBJECT)hInstance;
-    PDML_ETHERNET             p_EthLink         = (PDML_ETHERNET)pEthCxtLink->hContext;
-
-
-    if ( pEthCxtLink->bNew )
-    {
-        /* Set bNew to FALSE to indicate this node is not going to save to SysRegistry */
-        pEthCxtLink->bNew = FALSE;
-    }
-
-    if ( AnscSListPopEntryByLink(&pEthLink->Q_EthList, &pEthCxtLink->Linkage) )
-    {
-        AnscFreeMemory(pEthCxtLink->hContext);
-        AnscFreeMemory(pEthCxtLink);
-    }
-
-    return returnStatus;
 }
 
 /**********************************************************************
@@ -350,8 +225,7 @@ EthLink_GetParamBoolValue
         BOOL*                       pBool
     )
 {
-    PCONTEXT_LINK_OBJECT       pCxtLink   = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_ETHERNET              p_EthLink  = (PDML_ETHERNET   )pCxtLink->hContext;
+    PDML_ETHERNET              p_EthLink  = (PDML_ETHERNET   )hInsContext;
 
     /* check the parameter name and return the corresponding value */
     if( AnscEqualString(ParamName, "Enable", TRUE))
@@ -415,9 +289,9 @@ EthLink_GetParamUlongValue
         ULONG*                      puLong
     )
 {
-    PCONTEXT_LINK_OBJECT    pCxtLink      = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_ETHERNET           p_EthLink     = (PDML_ETHERNET   )pCxtLink->hContext;
-
+    PDML_ETHERNET           p_EthLink     = (PDML_ETHERNET   )hInsContext;
+    int instancenum = 1;
+    char mac[256];
     /* check the parameter name and return the corresponding value */
 
     if( AnscEqualString(ParamName, "Status", TRUE))
@@ -427,6 +301,16 @@ EthLink_GetParamUlongValue
         }
         return TRUE;
     }
+
+    if( AnscEqualString(ParamName, "MACAddrOffSet", TRUE))
+    {
+        instancenum = p_EthLink->InstanceNumber ;
+        DmlEthGetMacAddr(&mac,&p_EthLink->MACAddrOffSet,instancenum);
+
+        *puLong = p_EthLink->MACAddrOffSet;
+        return TRUE;
+    }
+
 
     /* CcspTraceWarning(("Unsupported parameter '%s'\n", ParamName)); */
     return FALSE;
@@ -480,8 +364,7 @@ EthLink_GetParamStringValue
         ULONG*                      pUlSize
     )
 {
-    PCONTEXT_LINK_OBJECT       pCxtLink      = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_ETHERNET              p_EthLink     = (PDML_ETHERNET   )pCxtLink->hContext;
+    PDML_ETHERNET              p_EthLink     = (PDML_ETHERNET   )hInsContext;
     PUCHAR                     pString       = NULL;
 
     /* check the parameter name and return the corresponding value */
@@ -529,7 +412,11 @@ EthLink_GetParamStringValue
     if( AnscEqualString(ParamName, "MACAddress", TRUE))
     {
         //Get MAC from corresponding interface
-        DmlGetHwAddressUsingIoctl( p_EthLink->Name, p_EthLink->MACAddress, sizeof(p_EthLink->MACAddress) );
+        char mac[256];
+        int val = 0;
+        int instancenum = p_EthLink->InstanceNumber ;
+
+        DmlEthGetMacAddr(p_EthLink->MACAddress,&val,instancenum);
 
         if ( AnscSizeOfString(p_EthLink->MACAddress) < *pUlSize)
         {
@@ -604,9 +491,8 @@ EthLink_SetParamBoolValue
         BOOL                        bValue
     )
 {
-    PCONTEXT_LINK_OBJECT       pCxtLink  = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_ETHERNET             p_EthLink  = (PDML_ETHERNET) pCxtLink->hContext;
 
+    PDML_ETHERNET             p_EthLink  = (PDML_ETHERNET) hInsContext;
     /* check the parameter name and set the corresponding value */
     if( AnscEqualString(ParamName, "Enable", TRUE))
     {
@@ -707,8 +593,7 @@ EthLink_SetParamUlongValue
         ULONG                       uValue
     )
 {
-    PCONTEXT_LINK_OBJECT       pCxtLink  = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_ETHERNET             p_EthLink  = (PDML_ETHERNET   )pCxtLink->hContext;
+    PDML_ETHERNET             p_EthLink  = (PDML_ETHERNET   )hInsContext;
 
     /* CcspTraceWarning(("Unsupported parameter '%s'\n", ParamName)); */
     return FALSE;
@@ -754,8 +639,7 @@ EthLink_SetParamStringValue
     )
 {
     PDATAMODEL_ETHERNET        pEthLink       = (PDATAMODEL_ETHERNET      )g_pBEManager->hEth;
-    PCONTEXT_LINK_OBJECT       pCxtLink       = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_ETHERNET              p_EthLink      = (PDML_ETHERNET   )pCxtLink->hContext;
+    PDML_ETHERNET              p_EthLink      = (PDML_ETHERNET   )hInsContext;
 
 
     /* check the parameter name and set the corresponding value */
@@ -862,23 +746,19 @@ EthLink_Commit
     )
 {
     ANSC_STATUS                     returnStatus  = ANSC_STATUS_SUCCESS;
-    PCONTEXT_LINK_OBJECT            pCxtLink      = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_ETHERNET                   p_EthLink     = (PDML_ETHERNET   )pCxtLink->hContext;
     PDATAMODEL_ETHERNET             pEthLink      = (PDATAMODEL_ETHERNET      )g_pBEManager->hEth;
+    PDML_ETHERNET                   p_EthLink     = (PDML_ETHERNET   )hInsContext;
 
-    if ( pCxtLink->bNew )
-    {
         returnStatus = DmlAddEth(NULL, p_EthLink );
 
         if ( returnStatus == ANSC_STATUS_SUCCESS )
         {
-            pCxtLink->bNew = FALSE;
+	   CcspTraceWarning(("Successfully added \n"));
         }
         else
         {
             DML_ETHERNET_INIT(p_EthLink);
         }
-    }
     
     return returnStatus;
 }
@@ -963,8 +843,7 @@ Marking_GetEntryCount
         ANSC_HANDLE                 hInsContext
     )
 {
-    PCONTEXT_LINK_OBJECT            pCxtLink      = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_ETHERNET                   p_EthLink     = (PDML_ETHERNET   )pCxtLink->hContext;
+    PDML_ETHERNET                   p_EthLink     = (PDML_ETHERNET   )hInsContext;
 
     if(p_EthLink == NULL) {
         return 0;
@@ -1012,8 +891,7 @@ Marking_GetEntry
         ULONG*                      pInsNumber
     )
 {
-    PCONTEXT_LINK_OBJECT            pCxtLink      = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_ETHERNET                   p_EthLink     = (PDML_ETHERNET   )pCxtLink->hContext;
+    PDML_ETHERNET                   p_EthLink     = (PDML_ETHERNET   )hInsContext;
 
     if ( nIndex < p_EthLink->NumberofMarkingEntries)
     {
@@ -1084,7 +962,9 @@ Marking_Synchronize
         ANSC_HANDLE                 hInsContext
     )
 {
+    PDML_ETHERNET                   p_EthLink     = (PDML_ETHERNET   )hInsContext;
     ANSC_STATUS  returnStatus = ANSC_STATUS_SUCCESS;
+    DmlEthCreateMarkingTable(p_EthLink);
     return returnStatus;
 }
 

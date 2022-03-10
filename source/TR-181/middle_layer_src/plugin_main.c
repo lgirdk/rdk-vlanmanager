@@ -349,8 +349,6 @@ VlanManager_Init
     /* register the back-end apis for the data model */
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_GetEntryCount", Vlan_GetEntryCount );
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_GetEntry",  Vlan_GetEntry);
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_AddEntry",  Vlan_AddEntry);
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_DelEntry",  Vlan_DelEntry);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_GetParamBoolValue",  Vlan_GetParamBoolValue);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_GetParamIntValue",  Vlan_GetParamIntValue);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_GetParamUlongValue",  Vlan_GetParamUlongValue);
@@ -365,8 +363,6 @@ VlanManager_Init
 
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "EthLink_GetEntryCount", EthLink_GetEntryCount );
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "EthLink_GetEntry",  EthLink_GetEntry);
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "EthLink_AddEntry",  EthLink_AddEntry);
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "EthLink_DelEntry",  EthLink_DelEntry);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "EthLink_GetParamBoolValue",  EthLink_GetParamBoolValue);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "EthLink_GetParamUlongValue",  EthLink_GetParamUlongValue);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "EthLink_GetParamStringValue",  EthLink_GetParamStringValue);

@@ -51,7 +51,7 @@
 /* **************************************************************************************************** */
 #define SYSEVENT_ETH_WAN_MAC                       "eth_wan_mac"
 
-#ifdef _HUB4_PRODUCT_REQ_
+#if defined _HUB4_PRODUCT_REQ_ || defined _DT_WAN_Manager_Enable_
 //VLAN ID
 #ifdef ENABLE_VLAN100
 #define VLANID_VALUE    100
@@ -61,32 +61,24 @@
 #endif // _HUB4_PRODUCT_REQ_
 
 #define DATAMODEL_PARAM_LENGTH 256
-
-//ETH Agent.
-#define ETH_DBUS_PATH                     "/com/cisco/spvtg/ccsp/ethagent"
-#define ETH_COMPONENT_NAME                "eRT.com.cisco.spvtg.ccsp.ethagent"
-#define ETH_NOE_PARAM_NAME                "Device.Ethernet.X_RDK_InterfaceNumberOfEntries"
-#define ETH_STATUS_PARAM_NAME             "Device.Ethernet.X_RDK_Interface.%d.WanStatus"
-#define ETH_IF_PARAM_NAME                 "Device.Ethernet.X_RDK_Interface.%d.Name"
-
-//DSL Agent.
-#define DSL_DBUS_PATH                     "/com/cisco/spvtg/ccsp/xdslmanager"
-#define DSL_COMPONENT_NAME                "eRT.com.cisco.spvtg.ccsp.xdslmanager"
-#define DSL_LINE_NOE_PARAM_NAME           "Device.DSL.LineNumberOfEntries"
-#define DSL_LINE_WAN_STATUS_PARAM_NAME    "Device.DSL.Line.%d.X_RDK_WanStatus"
-#define DSL_LINE_PARAM_NAME               "Device.DSL.Line.%d.Name"
+#define PARAM_SIZE 10
+#define PARAM_SIZE_32 32
+#define PARAM_SIZE_64 64
 
 //WAN Agent
 #define WAN_DBUS_PATH                     "/com/cisco/spvtg/ccsp/wanmanager"
 #define WAN_COMPONENT_NAME                "eRT.com.cisco.spvtg.ccsp.wanmanager"
-#define WAN_NOE_PARAM_NAME                "Device.X_RDK_WanManager.CPEInterfaceNumberOfEntries"
-#define WAN_IF_VLAN_NAME_PARAM            "Device.X_RDK_WanManager.CPEInterface.%d.Wan.Name"
-#define WAN_IF_NAME_PARAM_NAME            "Device.X_RDK_WanManager.CPEInterface.%d.Name"
-#define WAN_IF_LINK_STATUS                "Device.X_RDK_WanManager.CPEInterface.%d.Wan.LinkStatus"
-#define WAN_IF_STATUS_PARAM_NAME          "Device.X_RDK_WanManager.CPEInterface.%d.Wan.Status"
 
 #define WAN_MARKING_NOE_PARAM_NAME        "Device.X_RDK_WanManager.CPEInterface.%d.MarkingNumberOfEntries"
 #define WAN_MARKING_TABLE_NAME            "Device.X_RDK_WanManager.CPEInterface.%d.Marking."
+
+//PAM
+#define RDKB_PAM_COMPONENT_NAME           "eRT.com.cisco.spvtg.ccsp.pam"
+#define RDKB_PAM_DBUS_PATH                "/com/cisco/spvtg/ccsp/pam"
+#define PAM_BASE_MAC_ADDRESS              "Device.DeviceInfo.X_CISCO_COM_BaseMacAddress"
+
+pthread_mutex_t mDeletionMutex; //Mutex to check the deletion status.
+pthread_mutex_t mUpdationMutex; //Mutex to check the deletion status.
 
 extern void* g_pDslhDmlAgent;
 extern ANSC_HANDLE                        g_MessageBusHandle;
@@ -98,22 +90,20 @@ extern  ANSC_HANDLE                       bus_handle;
 
 static ANSC_STATUS DmlEthSetParamValues(const char *pComponent, const char *pBus, const char *pParamName, const char *pParamVal, enum dataType_e type, unsigned int bCommitFlag);
 static ANSC_STATUS DmlEthGetParamNames(char *pComponent, char *pBus, char *pParamName, char a2cReturnVal[][256], int *pReturnSize);
-static ANSC_STATUS DmlEthGetLowerLayersInstance(char *pLowerLayers, INT *piInstanceNumber);
 static ANSC_STATUS DmlCreateVlanLink(PDML_ETHERNET pEntry);
 static ANSC_STATUS DmlEthGetParamValues(char *pComponent, char *pBus, char *pParamName, char *pReturnVal);
 static ANSC_STATUS DmlEthDeleteVlanLink(PDML_ETHERNET pEntry);
-static BOOL DmlEthCheckVlanTaggedIfaceExists (char* ifName);
-static ANSC_STATUS DmlEthGetLowerLayersInstanceFromEthAgent(char *ifname, INT *piInstanceNumber);
-static ANSC_STATUS DmlEthGetLowerLayersInstanceFromWanManager(char *ifname, INT *piInstanceNumber);
 static void* DmlEthHandleVlanRefreshThread( void *arg );
-#ifdef _HUB4_PRODUCT_REQ_
-static ANSC_STATUS DmlEthCreateMarkingTable(vlan_configuration_t* pVlanCfg);
-#endif
+static int DmlEthSetEgressQoSMap( void );
+static int DmlEthSetMacAddr(CHAR *ifName, unsigned int Vlan_id, unsigned int intstance);
 static int DmlEthSyseventInit( void );
 static int DmlGetDeviceMAC( char *pMACOutput, int iMACLength );
 static ANSC_STATUS DmlUpdateEthWanMAC( void );
 static ANSC_STATUS DmlDeleteUnTaggedVlanLink(const PDML_ETHERNET pEntry);
 static ANSC_STATUS DmlCreateUnTaggedVlanLink(const PDML_ETHERNET pEntry);
+static int GetTotalNoOfVirtualInterfaces(void);
+static int GetVirtualIfaceId(int VlanIndex);
+
 /* *************************************************************************************************** */
 
 ANSC_STATUS
@@ -214,8 +204,7 @@ static int DmlEthSyseventInit( void )
         DmlEthInit
             (
                 ANSC_HANDLE                 hDml,
-                PANSC_HANDLE                phContext,
-                PFN_DML_ETHERNET_GEN        pValueGenFn
+                PANSC_HANDLE                phContext
             );
 
         Description:
@@ -224,7 +213,6 @@ static int DmlEthSyseventInit( void )
         Arguments:
             hDml               Opaque handle from DM adapter. Backend saves this handle for calling pValueGenFn.
              phContext       Opaque handle passed back from backend, needed by CosaDmlETHERNETXyz() routines.
-            pValueGenFn    Function pointer to instance number/alias generation callback.
 
         Return:
             Status of operation.
@@ -234,8 +222,7 @@ ANSC_STATUS
 DmlEthInit
     (
         ANSC_HANDLE                 hDml,
-        PANSC_HANDLE                phContext,
-        PFN_DML_ETHERNET_GEN        pValueGenFn
+        PANSC_HANDLE                phContext
     )
 {
     ANSC_STATUS returnStatus = ANSC_STATUS_SUCCESS;
@@ -439,14 +426,16 @@ DmlDeleteEthInterface
      * In case if vlanId is >= 0  indicates , a tagged vlan interface required in the region,
      * else required untagged interface
      */
-    int vlanid = DEFAULT_VLAN_ID;
+    int vlanid = 0;
+#if 0
+//#ifdef _HUB4_PRODUCT_REQ_
     returnStatus = GetVlanId(&vlanid, pEntry);
     if (ANSC_STATUS_SUCCESS != returnStatus)
     {
         CcspTraceError (("[%s-%d] Failed to get the vlan id \n", __FUNCTION__, __LINE__));
         return returnStatus;
     }
-
+#endif
     if (vlanid >= 0)
     {
         if (ANSC_STATUS_SUCCESS != DmlEthDeleteVlanLink(pEntry))
@@ -468,42 +457,11 @@ DmlDeleteEthInterface
             CcspTraceError(("[%s-%d] Failed to delete Untagged VLAN interface\n ", __FUNCTION__, __LINE__));
             return ANSC_STATUS_FAILURE;
         }
-        else
-        {
-            /**
-             * @note Notify WanStatus to WAN Manager and Base Manager.
-            */
-            DmlEthSendWanStatusForBaseManager(pEntry->BaseInterface, "Down");
-            CcspTraceInfo(("[%s-%d] Successfully deleted Untagged VLAN interface \n", __FUNCTION__, __LINE__));
-        }
     }
 
     return returnStatus;
 }
 
-static BOOL DmlEthCheckVlanTaggedIfaceExists( char *ifName )
-{
-    INT iVLANInstance = -1;
-
-    //Validate buffer
-    if ( NULL == ifName )
-    {
-        CcspTraceError(("%s %d - Invalid Memory\n", __FUNCTION__,__LINE__));
-        return FALSE;
-    }
-
-    //Get Instance for corresponding lower layer
-    DmlEthGetLowerLayersInstance( ifName, &iVLANInstance );
-
-    //Index is not present. so no need to do anything any ETH Link instance
-    if ( -1 == iVLANInstance )
-    {
-        CcspTraceError(("%s - Vlan link instance not present\n", __FUNCTION__));
-        return FALSE;
-    }
-
-    return TRUE;
-}
 
 /* * DmlSetEthCfg() */
 ANSC_STATUS
@@ -535,13 +493,15 @@ DmlSetEthCfg
      * else required untagged interface.
      */
     int vlanid = 0;
+#if 0
+//#ifdef _HUB4_PRODUCT_REQ_
     returnStatus = GetVlanId(&vlanid, pEntry);
     if (ANSC_STATUS_SUCCESS != returnStatus)
     {
         CcspTraceError (("[%s-%d] Failed to get the vlan id \n", __FUNCTION__, __LINE__));
         return returnStatus;
     }
-
+#endif
     if (vlanid >= 0)
     {
         if (ANSC_STATUS_SUCCESS != DmlCreateVlanLink(pEntry))
@@ -565,43 +525,44 @@ DmlSetEthCfg
 /* * DmlCreateVlanLink() */
 static ANSC_STATUS DmlCreateVlanLink( PDML_ETHERNET pEntry )
 {
-    INT iVLANInstance = -1;
+#if 0
+//#ifdef _HUB4_PRODUCT_REQ_
     INT iVLANId = DEFAULT_VLAN_ID;
-    INT iIterator = 0;
-    char acSetParamName[DATAMODEL_PARAM_LENGTH] = {0};
-    char acSetParamValue[DATAMODEL_PARAM_LENGTH] = {0};
+#endif
+
     char region[16] = {0};
     INT ifType = 0;
     INT VlanId = 0;
     INT TPId = 0;
     PDATAMODEL_VLAN    pVLAN    = (PDATAMODEL_VLAN)g_pBEManager->hVLAN;
     PDML_VLAN_CFG      pVlanCfg = NULL;
-    ANSC_HANDLE pNewEntry = NULL;
+
+    if(syscfg_init() != 0)
+    {
+       CcspTraceError(("%s syscfg init failed in rdk-vlanmanager\n",__FUNCTION__));
+    }
 
     if (NULL == pEntry)
     {
         CcspTraceError(("%s Invalid buffer\n",__FUNCTION__));
         return ANSC_STATUS_FAILURE;
     }
+#if 0
+//#ifdef _HUB4_PRODUCT_REQ_
+        if( 0 == strncmp(pEntry->BaseInterface, "dsl", 3) )
+        {
+           ifType = DSL;
+        }
+        else if( 0 == strncmp(pEntry->BaseInterface, "eth", 3) )
+        {
+           ifType = WANOE;
+        }
+        else if( 0 == strncmp(pEntry->Alias, "veip", 4) )
+        {
+           ifType = GPON;
+        }
 
-    if( 0 == strncmp(pEntry->BaseInterface, "dsl", 3))
-    {
-       ifType = DSL;
-    }
-    else if( 0 == strncmp(pEntry->BaseInterface, "eth", 3))
-    {
-       ifType = WANOE;
-    }
-    else if( 0 == strncmp(pEntry->Alias, "veip", 4) )
-    {
-       ifType = GPON;
-    }
-
-    if (NULL != pVLAN)
-    {
-        int ret = platform_hal_GetRouterRegion(region);
-
-        if( ret == RETURN_OK )
+        if (NULL != pVLAN)
         {
             for (int nIndex=0; nIndex< pVLAN->ulVlanCfgInstanceNumber; nIndex++)
             {
@@ -619,91 +580,44 @@ static ANSC_STATUS DmlCreateVlanLink( PDML_ETHERNET pEntry )
                 }
             }
         }
-    }
-    else
-    {
-        CcspTraceError(("%s pVLAN(NULL)\n",__FUNCTION__));
-    }
-
-    DmlEthGetLowerLayersInstance(pEntry->Path, &iVLANInstance);
-
-    //Create VLAN Link.
-    if (-1 == iVLANInstance)
-    {
-        char acTableName[128] = {0};
-        pNewEntry = Vlan_AddEntry(NULL, &iVLANInstance);
-
-        if (pNewEntry == NULL)
+        else
         {
-           CcspTraceError(("%s Failed to add table \n", __FUNCTION__));
-           return ANSC_STATUS_FAILURE;
+        CcspTraceError(("%s pVLAN(NULL)\n",__FUNCTION__));
         }
-    }
-    else
+#endif
+
+#if 0
+//#ifdef _HUB4_PRODUCT_REQ_
     {
         CcspTraceError(("%s Interface already exists \n", __FUNCTION__));
         return ANSC_STATUS_FAILURE;
     }
+#endif
 
-    CcspTraceInfo(("%s - Instance:%d\n", __FUNCTION__, iVLANInstance));
+    DmlEthSetEgressQoSMap();
 
-    //Set VLANID
-    if (Vlan_SetParamUlongValue(pNewEntry, "VLANID", VlanId) != TRUE)
-    {
-        CcspTraceError(("%s - Failed to set VLANID data model\n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
+    CcspTraceInfo(("%s - %s:Successfully created vlan interface \n", __FUNCTION__, ETH_MARKER_VLAN_TABLE_CREATE));
+    return ANSC_STATUS_SUCCESS;
+}
 
-    //Set TPID
-    if (Vlan_SetParamUlongValue(pNewEntry, "TPID", TPId) != TRUE)
-    {
-        CcspTraceError(("%s - Failed to set TPId data model\n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
+ANSC_STATUS DmlEthCreateVlanInterface(vlan_configuration_t *config)
+{
+     char cmd[256] = {0};
+     char wan_interface[IF_NAMESIZE] = {0};
+     char buff[10] =  {0};
+     if (NULL == config)
+     {
+          CcspTraceError(("Error: Invalid arguement \n"));
+          return ANSC_STATUS_FAILURE;
+     }
 
-    //Set BaseInterface.
-    if (Vlan_SetParamStringValue(pNewEntry, "X_RDK_BaseInterface", pEntry->BaseInterface) != TRUE)
-    {
-        CcspTraceError(("%s - Failed to set X_RDK_BaseInterface data model\n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
+    snprintf(cmd, sizeof(cmd), "ip link add link %s name %s type vlan id %u", config->L2Interface , config->L3Interface, config->VLANId);
+    v_secure_system(cmd);
 
-    //Set Alias
-    if (Vlan_SetParamStringValue(pNewEntry, "Alias", pEntry->Alias) != TRUE)
-    {
-        CcspTraceError(("%s - Failed to set Alias data model\n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
+    snprintf(cmd, sizeof(cmd), "ip link set %s up", config->L3Interface);
+    v_secure_system(cmd);
 
-    //Set VLAN Inetrfacename.
-    if (Vlan_SetParamStringValue(pNewEntry, "Name", pEntry->Name) != TRUE)
-    {
-        CcspTraceError(("%s - Failed to set Name data model\n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    //Set lowerlayers.
-    if (Vlan_SetParamStringValue(pNewEntry, "LowerLayers", pEntry->Path) != TRUE)
-    {
-        CcspTraceError(("%s - Failed to set LowerLayers data model\n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    //Set Enable.
-    if (Vlan_SetParamBoolValue(pNewEntry, "Enable", TRUE) != TRUE)
-    {
-        CcspTraceError(("%s - Failed to set Enable data model\n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    //Commit
-    if (Vlan_Commit(pNewEntry) != ANSC_STATUS_SUCCESS)
-    {
-        CcspTraceError(("%s - Failed to commit data model changes\n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    CcspTraceInfo(("%s - %s:Successfully created vlan interface %s\n", __FUNCTION__, ETH_MARKER_VLAN_TABLE_CREATE, pEntry->Name));
+    DmlEthSetMacAddr(config->L2Interface, config->VLANId, config->IfaceInstanceNumber);
 
     return ANSC_STATUS_SUCCESS;
 }
@@ -731,103 +645,7 @@ static ANSC_STATUS DmlCreateVlanLink( PDML_ETHERNET pEntry )
 **********************************************************************/
 ANSC_STATUS DmlEthDeleteVlanLink(PDML_ETHERNET pEntry)
 {
-    char acSetParamName[DATAMODEL_PARAM_LENGTH] = {0};
-    char acSetParamValue[DATAMODEL_PARAM_LENGTH] = {0};
-    char acTableName[128] = {0};
-    INT LineIndex = -1;
-    INT iVLANInstance = -1;
-    char iface_alias[64] = {0};
-    ANSC_STATUS ret = ANSC_STATUS_SUCCESS;
-
-    //Validate buffer
-    if (pEntry == NULL)
-    {
-        CcspTraceError(("[%s][%d]Invalid Memory\n", __FUNCTION__,__LINE__));
-        return ANSC_STATUS_FAILURE;
-    }
-    strncpy(iface_alias, pEntry->Alias, sizeof(iface_alias) - 1);
-
-    //Get Instance for corresponding lower layer
-    DmlEthGetLowerLayersInstance(pEntry->Path, &iVLANInstance);
-
-    //Index is not present. so no need to do anything any ETH Link instance
-    if (-1 == iVLANInstance)
-    {
-        CcspTraceError(("[%s][%d] Vlan link instance not present\n", __FUNCTION__, __LINE__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    //Set Enable - False
-    UINT uInstanceNumber = 0;
-    ANSC_HANDLE pVlanEntry = Vlan_GetEntry(NULL, (iVLANInstance - 1), &uInstanceNumber);
-    if (pVlanEntry != NULL)
-    {
-        if (Vlan_SetParamBoolValue(pVlanEntry, "Enable", FALSE) != TRUE)
-        {
-            CcspTraceInfo(("[%s][%d] Failed to set Enable data model to false \n", __FUNCTION__, __LINE__));
-            ret = ANSC_STATUS_FAILURE;
-            goto EXIT;
-        }
-        if (Vlan_Commit(pVlanEntry) != ANSC_STATUS_SUCCESS)
-        {
-            CcspTraceError(("%s - Failed to delete VLAN table instance (%d)\n", __FUNCTION__, uInstanceNumber));
-            ret = ANSC_STATUS_FAILURE;
-            goto EXIT;
-        }
-
-        //Delete Instance.
-        if (Vlan_DelEntry(NULL, pVlanEntry) != ANSC_STATUS_SUCCESS)
-        {
-            ret = ANSC_STATUS_FAILURE;
-            goto EXIT;
-        }
-    }
-
-EXIT:
-    /* Notify WanStatus to down for Base Manager. */
-    DmlEthSendWanStatusForBaseManager(pEntry->BaseInterface, "Down");
-    return ret;
-}
-
-/* * DmlEthGetLowerLayersInstance() */
-static ANSC_STATUS DmlEthGetLowerLayersInstance( char *pLowerLayers, INT *piInstanceNumber )
-{
-    char acTmpReturnValue[256] = {0};
-    INT iLoopCount, iTotalNoofEntries;
-    UINT uInstanceNumber = 0;
-    ULONG uSize = 0;
-
-    //Total count
-    iTotalNoofEntries = Vlan_GetEntryCount(NULL);
-
-    if (0 >= iTotalNoofEntries)
-    {
-        return ANSC_STATUS_SUCCESS;
-    }
-
-    //Traverse from loop
-    for (iLoopCount = 0; iLoopCount < iTotalNoofEntries; iLoopCount++)
-    {
-        //Query for LowerLayers
-        ANSC_HANDLE pVlanEntry = Vlan_GetEntry(NULL, iLoopCount, &uInstanceNumber);
-        if (pVlanEntry != NULL)
-        {
-            if (Vlan_GetParamStringValue(pVlanEntry, "LowerLayers", acTmpReturnValue, &uSize) == -1)
-            {
-                CcspTraceError(("[%s][%d] Failed to get LowerLayers value\n", __FUNCTION__, __LINE__));
-                continue;
-            }
-        }
-
-        //Compare lowerlayers
-        if (0 == strcmp(acTmpReturnValue, pLowerLayers))
-        {
-            *piInstanceNumber = uInstanceNumber;
-            break;
-        }
-    }
-
-    return ANSC_STATUS_SUCCESS;
+    return ANSC_STATUS_FAILURE;
 }
 
 /* * DmlEthGetParamValues() */
@@ -1056,264 +874,6 @@ DmlAddEth
     return ANSC_STATUS_SUCCESS;
 }
 
-static ANSC_STATUS
-DmlEthGetLowerLayersInstanceFromEthAgent(
-    char *ifname,
-    INT *piInstanceNumber)
-{
-    char acTmpReturnValue[256] = {0};
-    INT iLoopCount,
-        iTotalNoofEntries;
-
-    if (ANSC_STATUS_FAILURE == DmlEthGetParamValues(ETH_COMPONENT_NAME, ETH_DBUS_PATH, ETH_NOE_PARAM_NAME, acTmpReturnValue))
-    {
-        CcspTraceError(("[%s][%d]Failed to get param value\n", __FUNCTION__, __LINE__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    //Total count
-    iTotalNoofEntries = atoi(acTmpReturnValue);
-
-    //CcspTraceInfo(("[%s][%d]TotalNoofEntries:%d\n", __FUNCTION__, __LINE__, iTotalNoofEntries));
-
-    if ( 0 >= iTotalNoofEntries )
-    {
-        return ANSC_STATUS_SUCCESS;
-    }
-
-    //Traverse from loop
-    for (iLoopCount = 0; iLoopCount < iTotalNoofEntries; iLoopCount++)
-    {
-        char acTmpQueryParam[256] = {0};
-
-        //Query
-        snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), ETH_IF_PARAM_NAME, iLoopCount + 1);
-
-        memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
-        if (ANSC_STATUS_FAILURE == DmlEthGetParamValues(ETH_COMPONENT_NAME, ETH_DBUS_PATH, acTmpQueryParam, acTmpReturnValue))
-        {
-            CcspTraceError(("[%s][%d] Failed to get param value\n", __FUNCTION__, __LINE__));
-            continue;
-        }
-
-        //Compare name
-        if (0 == strcmp(acTmpReturnValue, ifname))
-        {
-            *piInstanceNumber = iLoopCount + 1;
-             break;
-        }
-    }
-
-    return ANSC_STATUS_SUCCESS;
-}
-
-static ANSC_STATUS
-DmlEthGetLowerLayersInstanceFromDslAgent(
-    char *ifname,
-    INT *piInstanceNumber)
-{
-    char acTmpReturnValue[256] = {0};
-    INT iLoopCount,
-        iTotalNoofEntries;
-
-    if (ANSC_STATUS_FAILURE == DmlEthGetParamValues(DSL_COMPONENT_NAME, DSL_DBUS_PATH, DSL_LINE_NOE_PARAM_NAME, acTmpReturnValue))
-    {
-        CcspTraceError(("[%s][%d]Failed to get param value\n", __FUNCTION__, __LINE__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    //Total count
-    iTotalNoofEntries = atoi(acTmpReturnValue);
-
-    if ( 0 >= iTotalNoofEntries )
-    {
-        return ANSC_STATUS_SUCCESS;
-    }
-
-    //Traverse from loop
-    for (iLoopCount = 0; iLoopCount < iTotalNoofEntries; iLoopCount++)
-    {
-        char acTmpQueryParam[256] = {0};
-
-        //Query
-        snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), DSL_LINE_PARAM_NAME, iLoopCount + 1);
-
-        memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
-        if (ANSC_STATUS_FAILURE == DmlEthGetParamValues(DSL_COMPONENT_NAME, DSL_DBUS_PATH, acTmpQueryParam, acTmpReturnValue))
-        {
-            CcspTraceError(("[%s][%d] Failed to get param value\n", __FUNCTION__, __LINE__));
-            continue;
-        }
-
-        //Compare name
-        if (0 == strcmp(acTmpReturnValue, ifname))
-        {
-            *piInstanceNumber = iLoopCount + 1;
-             break;
-        }
-    }
-
-    return ANSC_STATUS_SUCCESS;
-}
-
-/* Set wan status event to Eth or DSL Agent */
-ANSC_STATUS DmlEthSendWanStatusForBaseManager(char *ifname, char *WanStatus)
-{
-    char acSetParamName[DATAMODEL_PARAM_LENGTH] = {0};
-    INT iWANInstance = -1;
-    INT iIsDSLInterface = 0;
-    INT iIsWANOEInterface = 0;
-
-    //Validate buffer
-    if ((NULL == ifname) || (NULL == WanStatus))
-    {
-        CcspTraceError(("%s Invalid Memory\n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    //Like dsl0, dsl0 etc
-    if( 0 == strncmp(ifname, "dsl", 3) )
-    {
-       iIsDSLInterface = 1;
-    }
-    else if( 0 == strncmp(ifname, "eth", 3) ) //Like eth3, eth0 etc
-    {
-       iIsWANOEInterface = 1;
-    }
-    else if( 0 == strncmp(ifname, "veip", 4) ) //Like veip0
-    {
-       iIsWANOEInterface = 1;
-    }
-    else
-    {
-        CcspTraceError(("%s Invalid WAN interface \n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    if( iIsWANOEInterface )
-    {
-       //Get Instance for corresponding name
-       DmlEthGetLowerLayersInstanceFromEthAgent(ifname, &iWANInstance);
-
-       //Index is not present. so no need to do anything any WAN instance
-       if (-1 == iWANInstance)
-       {
-          CcspTraceError(("%s %d Eth instance not present\n", __FUNCTION__, __LINE__));
-          return ANSC_STATUS_FAILURE;
-       }
-
-       CcspTraceInfo(("%s - %s:WANOE ETH Link Instance:%d\n", __FUNCTION__, ETH_MARKER_NOTIFY_WAN_BASE, iWANInstance));
-
-       //Set WAN Status
-       snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, ETH_STATUS_PARAM_NAME, iWANInstance);
-       DmlEthSetParamValues(ETH_COMPONENT_NAME, ETH_DBUS_PATH, acSetParamName, WanStatus, ccsp_string, TRUE);
-    }
-    else if( iIsDSLInterface )
-    {
-       //Get Instance for corresponding name
-       DmlEthGetLowerLayersInstanceFromDslAgent(ifname, &iWANInstance);
-
-       //Index is not present. so no need to do anything any WAN instance
-       if (-1 == iWANInstance)
-       {
-          CcspTraceError(("%s %d DSL instance not present\n", __FUNCTION__, __LINE__));
-          return ANSC_STATUS_FAILURE;
-       }
-
-       CcspTraceInfo(("%s - %s:DSL Line Instance:%d\n", __FUNCTION__, ETH_MARKER_NOTIFY_WAN_BASE, iWANInstance));
-
-       //Set WAN Status
-       snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, DSL_LINE_WAN_STATUS_PARAM_NAME, iWANInstance);
-       DmlEthSetParamValues(DSL_COMPONENT_NAME, DSL_DBUS_PATH, acSetParamName, WanStatus, ccsp_string, TRUE);
-    }
-
-    CcspTraceInfo(("%s - %s:Successfully notified %s event to base WAN interface for %s interface \n", __FUNCTION__, ETH_MARKER_NOTIFY_WAN_BASE, WanStatus, ifname));
-
-    return ANSC_STATUS_SUCCESS;
-}
-
-/* Set wan status event to WAN Manager */
-ANSC_STATUS DmlEthSendLinkStatusForWanManager(char *ifname, char *LinkStatus)
-{
-    char acSetParamName[DATAMODEL_PARAM_LENGTH] = {0};
-    INT iWANInstance = -1;
-    INT iIsDSLInterface = 0;
-    INT iIsWANOEInterface = 0;
-
-    //Validate buffer
-    if ((NULL == ifname) || (NULL == LinkStatus))
-    {
-        CcspTraceError(("%s Invalid Memory\n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    //Get Instance for corresponding name
-    DmlEthGetLowerLayersInstanceFromWanManager(ifname, &iWANInstance);
-
-    //Index is not present. so no need to do anything any WAN instance
-    if (-1 == iWANInstance)
-    {
-      CcspTraceError(("%s %d Interface instance not present\n", __FUNCTION__, __LINE__));
-      return ANSC_STATUS_FAILURE;
-    }
-
-
-    //Set WAN LinkStatus
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, WAN_IF_LINK_STATUS, iWANInstance);
-    DmlEthSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName, LinkStatus, ccsp_string, TRUE);
-
-    CcspTraceInfo(("%s - %s:Successfully notified %s event to WAN Manager for %s interface \n", __FUNCTION__, ETH_MARKER_NOTIFY_WAN_BASE, LinkStatus, ifname));
-
-    return ANSC_STATUS_SUCCESS;
-}
-
-static ANSC_STATUS
-DmlEthGetLowerLayersInstanceFromWanManager(
-    char *ifname,
-    INT *piInstanceNumber)
-{
-    char acTmpReturnValue[256] = {0};
-    INT iLoopCount,
-        iTotalNoofEntries;
-
-    if (ANSC_STATUS_FAILURE == DmlEthGetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, WAN_NOE_PARAM_NAME, acTmpReturnValue))
-    {
-        CcspTraceError(("[%s][%d]Failed to get param value\n", __FUNCTION__, __LINE__));
-        return ANSC_STATUS_FAILURE;
-    }
-    //Total count
-    iTotalNoofEntries = atoi(acTmpReturnValue);
-
-    if (0 >= iTotalNoofEntries)
-    {
-        return ANSC_STATUS_SUCCESS;
-    }
-
-    //Traverse from loop
-    for (iLoopCount = 0; iLoopCount < iTotalNoofEntries; iLoopCount++)
-    {
-        char acTmpQueryParam[256] = {0};
-
-        //Query
-        snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), WAN_IF_NAME_PARAM_NAME, iLoopCount + 1);
-
-        memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
-        if (ANSC_STATUS_FAILURE == DmlEthGetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acTmpQueryParam, acTmpReturnValue))
-        {
-            CcspTraceError(("[%s][%d] Failed to get param value\n", __FUNCTION__, __LINE__));
-            continue;
-        }
-
-        //Compare name
-        if (0 == strcmp(acTmpReturnValue, ifname))
-        {
-            *piInstanceNumber = iLoopCount + 1;
-             break;
-        }
-    }
-
-    return ANSC_STATUS_SUCCESS;
-}
 
 /* VLAN Refresh Thread */
 static void* DmlEthHandleVlanRefreshThread( void *arg )
@@ -1348,20 +908,23 @@ static void* DmlEthHandleVlanRefreshThread( void *arg )
     //Get status of VLAN link
     while(iIterator < 10)
     {
-        if (ANSC_STATUS_FAILURE == getInterfaceStatus(pstRefreshCfg->stVlanCfg.L3Interface, &status))
+        char interface_name[IF_NAMESIZE] = {0};
+
+        snprintf(interface_name, sizeof(interface_name), "%s", pstRefreshCfg->stVlanCfg.L3Interface);
+
+        if (ANSC_STATUS_FAILURE == getInterfaceStatus(interface_name, &status))
         {
             CcspTraceError(("[%s][%d] getInterfaceStatus failed for %s !! \n", __FUNCTION__, __LINE__, pstRefreshCfg->stVlanCfg.L3Interface));
             goto EXIT;
         }
-        if (status == VLAN_IF_UP)
-        {
-            //Needs to inform base interface is UP after vlan refresh
-            DmlEthSendLinkStatusForWanManager(pstRefreshCfg->stVlanCfg.BaseInterface, "Up");
-            break;
-        }
 
         iIterator++;
         sleep(2);
+    }
+
+    if(!strncmp(pstRefreshCfg->stVlanCfg.L2Interface, "veip", 4))
+    {
+        v_secure_system("/etc/gpon_vlan_init.sh");
     }
 
     CcspTraceInfo(("%s - %s:Successfully refreshed VLAN WAN interface(%s)\n", __FUNCTION__, ETH_MARKER_VLAN_REFRESH, pstRefreshCfg->WANIfName));
@@ -1391,7 +954,7 @@ ANSC_STATUS VlanManager_SetVlanMarkings( char *ifname, vlan_configuration_t *pVl
                              a2cTmpTableParams[16][256] = {0};
     INT                      iLoopCount,
                              iTotalNoofEntries = 0,
-                             iWANInstance   = -1;
+                             iWANInstance   = 1;
 
     //Validate buffer
     if ( ( NULL == ifname ) || ( NULL == pVlanCfg ) )
@@ -1399,32 +962,7 @@ ANSC_STATUS VlanManager_SetVlanMarkings( char *ifname, vlan_configuration_t *pVl
         CcspTraceError(("%s Invalid Memory\n", __FUNCTION__));
         return ANSC_STATUS_FAILURE;
     }
-    //Get Instance for corresponding name
-    DmlEthGetLowerLayersInstanceFromWanManager(pVlanCfg->BaseInterface, &iWANInstance);
-
-    //Index is not present. so no need to do anything any WAN instance
-    if (-1 == iWANInstance)
-    {
-        CcspTraceError(("%s %d Eth instance not present\n", __FUNCTION__, __LINE__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    CcspTraceInfo(("%s %d Wan Interface Instance:%d\n", __FUNCTION__, __LINE__, iWANInstance));
-
-    //Get Marking entries
-    memset(acGetParamName, 0, sizeof(acGetParamName));
-    snprintf(acGetParamName, sizeof(acGetParamName), WAN_MARKING_NOE_PARAM_NAME, iWANInstance);
-    if ( ANSC_STATUS_FAILURE == DmlEthGetParamValues( WAN_COMPONENT_NAME, WAN_DBUS_PATH, acGetParamName, acTmpReturnValue ) )
-    {
-        CcspTraceError(("[%s][%d]Failed to get param value\n", __FUNCTION__, __LINE__));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    //Total count
-    iTotalNoofEntries = atoi(acTmpReturnValue);
-
-    CcspTraceInfo(("%s Wan Instance(%d) Marking Entries:%d\n", __FUNCTION__, iWANInstance, iTotalNoofEntries));
-
+//TODO Need to revisit while handling qos
 #ifdef _HUB4_PRODUCT_REQ_
     //Allocate resource for marking
     pVlanCfg->skbMarkingNumOfEntries = iTotalNoofEntries;
@@ -1508,7 +1046,8 @@ ANSC_STATUS VlanManager_SetVlanMarkings( char *ifname, vlan_configuration_t *pVl
     }
 #else
     //Create vlan interface
-    vlan_eth_hal_createInterface(pVlanCfg);
+    DmlEthCreateVlanInterface(pVlanCfg);
+
 #endif
 
     //Needs to set eth_wan_mac for ETHWAN case
@@ -1524,14 +1063,12 @@ ANSC_STATUS VlanManager_SetVlanMarkings( char *ifname, vlan_configuration_t *pVl
     return ANSC_STATUS_SUCCESS;
 }
 
-
-
 /* Set VLAN Refresh */
 ANSC_STATUS DmlEthSetVlanRefresh( char *ifname, VLAN_REFRESH_CALLER_ENUM  enRefreshCaller, vlan_configuration_t *pstVlanCfg )
 {
     pthread_t                refreshThreadId;
     PVLAN_REFRESH_CFG        pstRefreshCfg  = NULL;
-    INT                      iWANInstance   = -1,
+    INT                      iWANInstance   = 1,
                              *piWANInstance = NULL,
                              iErrorCode     = -1;
 
@@ -1542,15 +1079,6 @@ ANSC_STATUS DmlEthSetVlanRefresh( char *ifname, VLAN_REFRESH_CALLER_ENUM  enRefr
         return ANSC_STATUS_FAILURE;
     }
 
-     //Get Instance for corresponding name
-    DmlEthGetLowerLayersInstanceFromWanManager(ifname, &iWANInstance);
-
-    //Index is not present. so no need to do anything any WAN instance
-    if (-1 == iWANInstance)
-    {
-        CcspTraceError(("%s %d Eth instance not present\n", __FUNCTION__, __LINE__));
-        return ANSC_STATUS_FAILURE;
-    }
 
     CcspTraceInfo(("%s %d Wan Interface Instance:%d\n", __FUNCTION__, __LINE__, iWANInstance));
 
@@ -1648,7 +1176,7 @@ static int DmlGetDeviceMAC( char *pMACOutput, int iMACLength )
    return -1;
 }
 
-#ifdef _HUB4_PRODUCT_REQ_
+#if defined(_HUB4_PRODUCT_REQ_) 
 static ANSC_STATUS DmlEthCreateMarkingTable(vlan_configuration_t* pVlanCfg)
 {
     if (NULL == pVlanCfg)
@@ -1705,6 +1233,167 @@ static ANSC_STATUS DmlEthCreateMarkingTable(vlan_configuration_t* pVlanCfg)
     return ANSC_STATUS_SUCCESS;
 }
 #endif //_HUB4_PRODUCT_REQ_
+
+ANSC_STATUS DmlEthCreateMarkingTable(PDML_ETHERNET p_EthLink)
+{
+    int                    iLoopCount   = 0;
+
+    if (NULL == p_EthLink)
+    {
+        CcspTraceError(("%s Invalid Memory\n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+	
+    //TODO Need to revisit when QoS marking is handled
+    p_EthLink->NumberofMarkingEntries = 1;
+    p_EthLink->pstDataModelMarking = (PCOSA_DML_MARKING) malloc(sizeof(COSA_DML_MARKING)*(p_EthLink->NumberofMarkingEntries));
+    if(p_EthLink->pstDataModelMarking == NULL)
+    {
+        CcspTraceError(("%s Failed to allocate Memory\n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    memset(p_EthLink->pstDataModelMarking, 0, (sizeof(COSA_DML_MARKING)*(p_EthLink->NumberofMarkingEntries)));
+    for(iLoopCount = 0; iLoopCount < p_EthLink->NumberofMarkingEntries; iLoopCount++)
+    {
+       (p_EthLink->pstDataModelMarking + iLoopCount)->SKBPort = 0;
+       (p_EthLink->pstDataModelMarking + iLoopCount)->EthernetPriorityMark = 0;
+    }
+
+    return ANSC_STATUS_SUCCESS;
+}
+
+// Mac address schema Handling for VLAN interface.
+static int DmlEthSetMacAddr(CHAR *ifName, unsigned int Vlan_id, unsigned int instance)
+{
+    unsigned long long int number, new_mac;
+    char acTmpReturnValue[256] = {0};
+    char command[512] = {0};
+    char phy_interface[IF_NAMESIZE] = {0};
+    char buff[PARAM_SIZE] =  {0};
+    char hex[32];
+    char macStr[32];
+    int i, j = 0;
+    int add = 0;
+    char paramName[PARAM_SIZE_32] = {0};
+    char *strValue  = NULL;
+    int retPsmGet = CCSP_SUCCESS;
+
+    if(ANSC_STATUS_FAILURE == DmlEthGetParamValues(RDKB_PAM_COMPONENT_NAME, RDKB_PAM_DBUS_PATH, PAM_BASE_MAC_ADDRESS, acTmpReturnValue))
+    {
+        CcspTraceError(("[%s][%d]Failed to get param value\n", __FUNCTION__, __LINE__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    for(i = 0; acTmpReturnValue[i] != '\0'; i++)
+    {
+        if(acTmpReturnValue[i] != ':')
+        {
+            acTmpReturnValue[j++] = acTmpReturnValue[i];
+        }
+    }
+    acTmpReturnValue[j] = '\0';
+    sscanf(acTmpReturnValue, "%64llx", &number);
+
+    if(syscfg_init() != 0)
+    {
+       CcspTraceError(("%s syscfg init failed in rdk-vlanmanager\n",__FUNCTION__));
+    }
+
+    snprintf(paramName, sizeof(paramName), "dmsb.ethlink.%d.macoffset", instance);
+    retPsmGet = PSM_VALUE_GET_VALUE(paramName, strValue);
+    add = atoi(strValue);
+    new_mac = number + add;
+
+    snprintf(hex, sizeof(hex), "%08llx", new_mac);
+    snprintf(macStr, sizeof(macStr), "%c%c:%c%c:%c%c:%c%c:%c%c:%c%c",
+    hex[0], hex[1], hex[2], hex[3], hex[4], hex[5], hex[6], hex[7], hex[8], hex[9], hex[10], hex[11]);
+
+    snprintf(command, sizeof(command), "ip link set dev %s.%d address %s\n",ifName, Vlan_id, macStr);
+    v_secure_system(command);
+    memset(command, 0, sizeof(command));
+
+    return 0;
+}
+
+static int DmlEthSetEgressQoSMap( void )
+{
+    char *strValue = NULL;
+    int retPsmGet = CCSP_SUCCESS;
+    int vlanCount = 1;
+    int vlanID = 0;
+    char wanifname[64] = {0};
+    char markingList[64] = {0};
+    char TmpList[64] = {0};
+    char *token = NULL;
+    char vlanifname[64] = {0};
+    char psmEntry[512] = {0};
+    char EthPriority[32] = {0};
+    char SKBMark[32] = {0};
+    char command[512] = {0};
+    char buff[32] = {0};
+    char syscfgEntry[512] = {0};
+    int numVlanIfc = 0;
+    const char *psmList = "dmsb.wanmanager.if.1.Marking.List";
+
+    if(syscfg_init() != 0)
+    {
+       CcspTraceError(("%s syscfg init failed in rdk-vlanmanager\n",__FUNCTION__));
+    }
+
+    numVlanIfc = GetTotalNoOfVirtualInterfaces();
+
+    if(bus_handle != NULL) {
+
+        syscfg_get(NULL, "wan_physical_ifname", wanifname, sizeof(wanifname));
+
+        retPsmGet = PSM_VALUE_GET_VALUE(psmList, strValue);
+        if(retPsmGet == CCSP_SUCCESS && strValue != NULL)
+        {
+            strncpy(markingList, strValue, sizeof(markingList));
+            Ansc_FreeMemory_Callback(strValue);
+            strValue = NULL;
+        }
+
+        snprintf( TmpList, sizeof( TmpList ), markingList );
+        token = strtok( TmpList, "-" );
+        while ( token != NULL && vlanCount <= numVlanIfc )
+        {
+            vlanID = GetVirtualIfaceId(vlanCount);
+            memset(buff, 0, sizeof(buff));
+            memset(syscfgEntry, 0, sizeof(syscfgEntry));
+
+            snprintf(psmEntry, sizeof(psmEntry), "dmsb.wanmanager.if.1.Marking.%s.SKBMark", token);
+            retPsmGet = PSM_VALUE_GET_VALUE(psmEntry, strValue);
+            if(retPsmGet == CCSP_SUCCESS && strValue != NULL) { // Get SKBMark
+                strncpy(SKBMark, strValue, sizeof(SKBMark));
+                Ansc_FreeMemory_Callback(strValue);
+                strValue = NULL;
+            }
+
+            memset(psmEntry, 0, sizeof(psmEntry));
+            snprintf(psmEntry, sizeof(psmEntry), "dmsb.wanmanager.if.1.Marking.%s.EthernetPriorityMark", token);
+            retPsmGet = PSM_VALUE_GET_VALUE(psmEntry, strValue);
+            if(retPsmGet == CCSP_SUCCESS && strValue != NULL) { // Get EthernetPriorityMark
+                strncpy(EthPriority, strValue, sizeof(EthPriority));
+                Ansc_FreeMemory_Callback(strValue);
+                strValue = NULL;
+            }
+
+            memset(psmEntry, 0, sizeof(psmEntry));
+            snprintf(command, sizeof(command), "ip link set %s.%d type vlan egress-qos-map %s:%s", wanifname, vlanID, SKBMark, EthPriority);
+            v_secure_system(command);
+            memset(command, 0, sizeof(command));
+
+            token = strtok( NULL, "-" );
+            if (token != NULL && numVlanIfc > vlanCount)
+		vlanCount++ ;
+        }
+    }
+    return 0;
+}
+
+
 
 ANSC_STATUS getInterfaceStatus(const char *iface, vlan_interface_status_e *status)
 {
@@ -1849,6 +1538,8 @@ static ANSC_STATUS DmlDeleteUnTaggedVlanLink(const PDML_ETHERNET pEntry)
         return returnStatus;
     }
 
+#if 0
+//#ifdef _HUB4_PRODUCT_REQ_
     if ( ( status != VLAN_IF_NOTPRESENT ) && ( status != VLAN_IF_ERROR ) )
     {
         returnStatus = vlan_eth_hal_deleteInterface(pEntry->Name, pEntry->InstanceNumber);
@@ -1861,6 +1552,7 @@ static ANSC_STATUS DmlDeleteUnTaggedVlanLink(const PDML_ETHERNET pEntry)
             CcspTraceInfo(("[%s-%d]  %s:Successfully deleted this %s VLAN interface \n", __FUNCTION__, __LINE__, ETH_MARKER_VLAN_IF_DELETE, pEntry->Name));
         }
     }
+#endif
     return returnStatus;
 }
 
@@ -1911,12 +1603,6 @@ static ANSC_STATUS DmlCreateUnTaggedVlanLink(const PDML_ETHERNET pEntry)
             CcspTraceError(("[%s][%d] getInterfaceStatus failed for %s !! \n", __FUNCTION__, __LINE__, vlan_conf.L3Interface));
             return ANSC_STATUS_FAILURE;
         }
-        if (status == VLAN_IF_UP)
-        {
-            //Needs to inform base interface is UP after vlan creation
-            DmlEthSendWanStatusForBaseManager(pEntry->BaseInterface, "Up");
-            break;
-        }
 
         iIterator++;
         sleep(2);
@@ -1924,3 +1610,179 @@ static ANSC_STATUS DmlCreateUnTaggedVlanLink(const PDML_ETHERNET pEntry)
 
     return ANSC_STATUS_SUCCESS;
 }
+
+int DmlEthGetMacAddr(CHAR *mac[],int *addn,int intansnum)
+{
+    unsigned long long int number, new_mac;
+    char acTmpReturnValue[256] = {0};
+    char hex[32];
+    char macStr[32];
+    int i, j = 0;
+    int add = 0;
+    char paramName[PARAM_SIZE_32] = {0};
+    char *strValue  = NULL;
+    int Vlan_id =0;
+    int retPsmGet = CCSP_SUCCESS;
+
+    if(ANSC_STATUS_FAILURE == DmlEthGetParamValues(RDKB_PAM_COMPONENT_NAME, RDKB_PAM_DBUS_PATH, PAM_BASE_MAC_ADDRESS, acTmpReturnValue))
+    {
+        CcspTraceError(("[%s][%d]Failed to get param value\n", __FUNCTION__, __LINE__));
+        return ANSC_STATUS_FAILURE;
+    }
+    for(i = 0; acTmpReturnValue[i] != '\0'; i++)
+    {
+        if(acTmpReturnValue[i] != ':')
+        {
+            acTmpReturnValue[j++] = acTmpReturnValue[i];
+        }
+    }
+    acTmpReturnValue[j] = '\0';
+    sscanf(acTmpReturnValue, "%64llx", &number);
+
+    snprintf(paramName, sizeof(paramName), "dmsb.ethlink.%d.macoffset", intansnum);
+    retPsmGet = PSM_VALUE_GET_VALUE(paramName, strValue);
+    add = atoi(strValue);
+    *addn = add ;
+    new_mac = number + add;
+
+    snprintf(hex, sizeof(hex), "%08llx", new_mac);
+    snprintf(macStr, sizeof(macStr), "%c%c:%c%c:%c%c:%c%c:%c%c:%c%c",
+    hex[0], hex[1], hex[2], hex[3], hex[4], hex[5], hex[6], hex[7], hex[8], hex[9], hex[10], hex[11]);
+
+    strcpy(mac,macStr);
+
+    return 0;
+ }
+
+/* Function to get total number of VLANs */
+static int GetTotalNoOfVirtualInterfaces(void)
+{
+    char paramName[PARAM_SIZE_64] = {0};
+    char *strValue                = NULL;
+    char *endptr                  = NULL;
+    int wanIfCount                = 0;
+    int activeIface               = -1;
+    int numOfVrIface              = 0;
+    int retPsmGet                 = CCSP_SUCCESS;
+
+    strcpy(paramName, "dmsb.wanmanager.wanifcount");
+    retPsmGet = PSM_VALUE_GET_VALUE(paramName, strValue);
+    if((retPsmGet == CCSP_SUCCESS) && (strValue != NULL))
+    {
+        wanIfCount = strtol(strValue, &endptr, 10);
+        Ansc_FreeMemory_Callback(strValue);
+        strValue = NULL;
+    }
+
+    for(int i = 1; i <= wanIfCount; i++)
+    {
+       memset(paramName, 0, sizeof(paramName));
+       sprintf(paramName, "dmsb.wanmanager.if.%d.Selection.ActiveLink", i);
+       retPsmGet = PSM_VALUE_GET_VALUE(paramName, strValue);
+       if((retPsmGet == CCSP_SUCCESS) && (strValue != NULL))
+       {
+           if(0 == strcmp(strValue, "TRUE"))
+           {
+              activeIface = i;
+
+              Ansc_FreeMemory_Callback(strValue);
+              strValue = NULL;
+
+              break;
+           }
+           Ansc_FreeMemory_Callback(strValue);
+           strValue = NULL;
+       }
+    }
+
+    if(-1 != activeIface)
+    {
+        memset(paramName, 0, sizeof(paramName));
+        sprintf(paramName, "dmsb.wanmanager.if.%d.VirtualInterfaceifcount", activeIface);
+
+        retPsmGet = PSM_VALUE_GET_VALUE(paramName, strValue);
+        if((retPsmGet == CCSP_SUCCESS) && (strValue != NULL))
+        {
+            numOfVrIface = strtol(strValue, &endptr, 10);
+            Ansc_FreeMemory_Callback(strValue);
+            strValue = NULL;
+        }
+    }
+
+    return numOfVrIface;
+}
+
+/* Function to get VLAN ID */
+static int GetVirtualIfaceId(int VlanIndex)
+{
+    char paramName[PARAM_SIZE_64] = {0};
+    char *strValue                = NULL;
+    char *endptr                  = NULL;
+    int wanIfCount                = 0;
+    int activeIface               = -1;
+    int numOfVrIface              = 0;
+    int retPsmGet                 = CCSP_SUCCESS;
+    int vlanInUseIndex            = -1;
+    int vlanId                    = 0;
+
+    strcpy(paramName, "dmsb.wanmanager.wanifcount");
+    retPsmGet = PSM_VALUE_GET_VALUE(paramName, strValue);
+    if((retPsmGet == CCSP_SUCCESS) && (strValue != NULL))
+    {
+        wanIfCount = strtol(strValue, &endptr, 10);
+        Ansc_FreeMemory_Callback(strValue);
+        strValue = NULL;
+    }
+
+    for(int i = 1; i <= wanIfCount; i++)
+    {
+       memset(paramName, 0, sizeof(paramName));
+       sprintf(paramName, "dmsb.wanmanager.if.%d.Selection.ActiveLink", i);
+       retPsmGet = PSM_VALUE_GET_VALUE(paramName, strValue);
+       if((retPsmGet == CCSP_SUCCESS) && (strValue != NULL))
+       {
+           if(0 == strcmp(strValue, "TRUE"))
+           {
+              activeIface = i;
+
+              Ansc_FreeMemory_Callback(strValue);
+              strValue = NULL;
+
+              break;
+           }
+           Ansc_FreeMemory_Callback(strValue);
+           strValue = NULL;
+       }
+    }
+
+    if(-1 != activeIface)
+    {
+        memset(paramName, 0, sizeof(paramName));
+        sprintf(paramName, "dmsb.wanmanager.if.%d.VirtualInterface.%d.VlanInUse", activeIface, VlanIndex);
+
+        retPsmGet = PSM_VALUE_GET_VALUE(paramName, strValue);
+        if((retPsmGet == CCSP_SUCCESS) && (strValue != NULL))
+        {
+            sscanf(strValue, "%*[^0123456789]%d", &vlanInUseIndex);
+            Ansc_FreeMemory_Callback(strValue);
+            strValue = NULL;
+        }
+    }
+
+    if(-1 != vlanInUseIndex)
+    {
+        memset(paramName, 0, sizeof(paramName));
+        sprintf(paramName, "dmsb.vlanmanager.%d.vlanid", vlanInUseIndex);
+
+        retPsmGet = PSM_VALUE_GET_VALUE(paramName, strValue);
+        if((retPsmGet == CCSP_SUCCESS) && (strValue != NULL))
+        {
+            vlanId = strtol(strValue, &endptr, 10);
+            Ansc_FreeMemory_Callback(strValue);
+            strValue = NULL;
+        }
+    }
+
+    return vlanId;
+}
+

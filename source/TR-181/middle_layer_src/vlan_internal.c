@@ -38,16 +38,12 @@
 #include "plugin_main_apis.h"
 #include "poam_irepfo_interface.h"
 #include "sys_definitions.h"
+#include "ccsp_psm_helper.h"
 
 extern void * g_pDslhDmlAgent;
 extern char                     g_Subsystem[32];
 extern ANSC_HANDLE              bus_handle;
 
-#define PSM_VLANMANAGER_CFG_COUNT  "dmsb.vlanmanager.cfg.count"
-#define PSM_VLANMANAGER_CFG_REGION "dmsb.vlanmanager.cfg.%d.region"
-#define PSM_VLANMANAGER_CFG_IFTYPE "dmsb.vlanmanager.cfg.%d.iftype"
-#define PSM_VLANMANAGER_CFG_VLANID "dmsb.vlanmanager.cfg.%d.vlanid"
-#define PSM_VLANMANAGER_CFG_TPID   "dmsb.vlanmanager.cfg.%d.tpid"
 
 /**********************************************************************
 
@@ -102,8 +98,9 @@ VlanCreate
     return  (ANSC_HANDLE)pMyObject;
 }
 
-int DmlVlanGetPSMRecordValue ( char *pPSMEntry, char *pOutputString )
+ANSC_STATUS DmlVlanGetPSMRecordValue ( char *pPSMEntry, char *pOutputString )
 {
+    int ret_val = ANSC_STATUS_SUCCESS;
     int   retPsmGet = CCSP_SUCCESS;
     char *strValue  = NULL;
 
@@ -114,7 +111,7 @@ int DmlVlanGetPSMRecordValue ( char *pPSMEntry, char *pOutputString )
         return retPsmGet;
     }
 
-    retPsmGet = PSM_Get_Record_Value2( bus_handle, g_Subsystem, pPSMEntry, NULL, &strValue );
+    retPsmGet = PSM_VALUE_GET_VALUE(pPSMEntry, strValue);
     if ( retPsmGet == CCSP_SUCCESS )
     {
         //Copy till end of the string
@@ -123,86 +120,102 @@ int DmlVlanGetPSMRecordValue ( char *pPSMEntry, char *pOutputString )
         ((CCSP_MESSAGE_BUS_INFO *)bus_handle)->freefunc(strValue);
     }
 
-    return retPsmGet;
+    return ret_val;
 }
 
-
-void VlanCfgInitialize( ANSC_HANDLE hThisObject)
+void VlanTerminationInitialize( ANSC_HANDLE hThisObject)
 {
     PDATAMODEL_VLAN pMyObject = (PDATAMODEL_VLAN)hThisObject;
     char acPSMQuery[128]    = { 0 };
     char acPSMValue[64]     = { 0 };
-    INT vlancfgCount = 0;
+    INT vlanCount = 0;
     INT nIndex = 0;
+    int ret ;
 
+    /* delay to let it initialize */
+    sleep(2);
     /* get cfg count */
-    memset(acPSMQuery, 0, sizeof(acPSMQuery));
-    memset(acPSMValue, 0, sizeof(acPSMValue));
-    snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_CFG_COUNT );
-    if (  CCSP_SUCCESS == DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue ) )
+    snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_COUNT );
+    ret = DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue )   ;
+    if ( ret == 0)
     {
-        vlancfgCount = atoi (acPSMValue);
+        vlanCount = atoi (acPSMValue);
     }
 
-    pMyObject->ulVlanCfgInstanceNumber = vlancfgCount ;
-    PDML_VLAN_CFG pVlanCfg = (PDML_VLAN_CFG)AnscAllocateMemory(sizeof(DML_VLAN_CFG)* vlancfgCount);
-    memset(pVlanCfg, 0, sizeof(DML_VLAN_CFG)* vlancfgCount);
+    pMyObject->ulVlantrInstanceNumber = vlanCount ;
 
-    for(nIndex = 0; nIndex < vlancfgCount; nIndex++)
+    PDML_VLAN pVlan = (PDML_VLAN)AnscAllocateMemory(sizeof(DML_VLAN)* vlanCount);
+    memset(pVlan, 0, sizeof(pVlan));
+
+    for(nIndex = 0; nIndex < vlanCount; nIndex++)
     {
-        pVlanCfg[nIndex].InstanceNumber = nIndex + 1;
-
-        /* get cfg region from psm */
-        memset(acPSMQuery, 0, sizeof(acPSMQuery));
-        memset(acPSMValue, 0, sizeof(acPSMValue));
-        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_CFG_REGION, nIndex + 1 );
-        if (  CCSP_SUCCESS == DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue ) )
+        pVlan[nIndex].InstanceNumber = nIndex + 1;
+        /* get enable from psm */
+        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_ENABLE, nIndex + 1 );
+        ret = DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue );
+        if ( ret == 0)
         {
-            strncpy(pVlanCfg[nIndex].Region, acPSMValue, sizeof(pVlanCfg[nIndex].Region) - 1);
-        }
-
-        /* get cfg interfaceType from psm */
-        memset(acPSMQuery, 0, sizeof(acPSMQuery));
-        memset(acPSMValue, 0, sizeof(acPSMValue));
-        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_CFG_IFTYPE, nIndex + 1 );
-        if (  CCSP_SUCCESS == DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue ) )
-        {
-            if(0 == strncmp(acPSMValue,"DSL",3) )
+            if(strcmp(acPSMValue,PSM_ENABLE_STRING_TRUE) == 0)
             {
-                pVlanCfg[nIndex].InterfaceType = DSL;
+                pVlan[nIndex].Enable = TRUE;
             }
-            else if (0 == strncmp(acPSMValue,"WANOE",5))
+            else
             {
-                pVlanCfg[nIndex].InterfaceType = WANOE;
-            }
-            else if (0 == strncmp(acPSMValue,"GPON",4))
-            {
-                pVlanCfg[nIndex].InterfaceType = GPON;
+                pVlan[nIndex].Enable = FALSE;
             }
         }
 
-        /* get cfg vlanid from psm */
-        memset(acPSMQuery, 0, sizeof(acPSMQuery));
-        memset(acPSMValue, 0, sizeof(acPSMValue));
-        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_CFG_VLANID, nIndex + 1 );
-        if (  CCSP_SUCCESS == DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue ) )
+        /* get alias from psm */
+        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_ALIAS, nIndex + 1 );
+        ret = DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue );
+        if ( ret == 0)
         {
-            pVlanCfg[nIndex].VLANId =  atoi (acPSMValue);
+             strcpy(pVlan[nIndex].Alias,acPSMValue);
+        }
+
+        /* get name from psm */
+        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_NAME, nIndex + 1 );
+        ret = DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue );
+        if ( ret == 0)
+        {
+             strcpy(pVlan[nIndex].Name,acPSMValue);
+        }
+        /* get lowerlayes from psm */
+        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_LOWERLAYERS, nIndex + 1 );
+        ret = DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue );
+        if ( ret == 0)
+        {
+             strcpy(pVlan[nIndex].LowerLayers,acPSMValue);
+        }
+
+        /* get vlanid from psm */
+        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_VLANID, nIndex + 1 );
+        ret = DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue );
+        if ( ret == 0)
+        {
+             pVlan[nIndex].VLANId = atoi(acPSMValue) ;
         }
 
         /* get cfg tpid from psm */
-        memset(acPSMQuery, 0, sizeof(acPSMQuery));
-        memset(acPSMValue, 0, sizeof(acPSMValue));
-        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_CFG_TPID, nIndex + 1 );
-        if (  CCSP_SUCCESS == DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue ) )
+        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_TPID, nIndex + 1 );
+        ret = DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue );
+        if ( ret == 0)
         {
-            pVlanCfg[nIndex].TPId = atoi (acPSMValue);
+             pVlan[nIndex].TPId = atoi(acPSMValue) ;
         }
-    }
 
-    pMyObject->VlanCfg = pVlanCfg;
+        /* get base interface from psm */
+        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_BASEINTERFACE, nIndex + 1 );
+        ret = DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue );
+        if ( ret == 0)
+        {
+             strcpy(pVlan[nIndex].BaseInterface,acPSMValue);
+        }
+     }
 
+    pMyObject->VlanTer = pVlan;
 }
+
 /**********************************************************************
 
     caller:     self
@@ -235,128 +248,15 @@ VlanInitialize
 {
     ANSC_STATUS                     returnStatus     = ANSC_STATUS_SUCCESS;
     PDATAMODEL_VLAN                 pMyObject        = (PDATAMODEL_VLAN)hThisObject;
-    PSLAP_VARIABLE                  pSlapVariable    = (PSLAP_VARIABLE             )NULL;
-    PPOAM_IREP_FOLDER_OBJECT        pPoamIrepFoCOSA  = NULL;
-    PPOAM_IREP_FOLDER_OBJECT        pPoamIrepFoVLAN   = NULL;
-    PPOAM_IREP_FOLDER_OBJECT        pPoamIrepFoVLANPt = NULL;
 
     /* Call Initiation */
-    returnStatus = DmlVlanInit(NULL, NULL, VlanGen);
+    returnStatus = DmlVlanInit(NULL, NULL);
     if ( returnStatus != ANSC_STATUS_SUCCESS )
     {
         return returnStatus;
     }
 
-    VlanCfgInitialize( pMyObject );
-
-    /* Initiation all functions */
-    AnscSListInitializeHeader( &pMyObject->VLANPMappingList );
-    AnscSListInitializeHeader( &pMyObject->Q_VlanList );
-    pMyObject->MaxInstanceNumber        = 0;
-    pMyObject->ulPtNextInstanceNumber   = 1;
-    pMyObject->PreviousVisitTime        = 0;
-
-    /*Create VLAN folder in configuration */
-    pPoamIrepFoCOSA = (PPOAM_IREP_FOLDER_OBJECT)g_GetRegistryRootFolder(g_pDslhDmlAgent);
-
-    if ( !pPoamIrepFoCOSA )
-    {
-        returnStatus = ANSC_STATUS_FAILURE;
-
-        goto  EXIT;
-    }
-
-    pPoamIrepFoVLAN =
-        (PPOAM_IREP_FOLDER_OBJECT)pPoamIrepFoCOSA->GetFolder
-            (
-                (ANSC_HANDLE)pPoamIrepFoCOSA,
-                IREP_FOLDER_NAME_VLAN
-            );
-
-    if ( !pPoamIrepFoVLAN )
-    {
-        pPoamIrepFoCOSA->EnableFileSync((ANSC_HANDLE)pPoamIrepFoCOSA, FALSE);
-
-        pPoamIrepFoVLAN =
-            pPoamIrepFoCOSA->AddFolder
-                (
-                    (ANSC_HANDLE)pPoamIrepFoCOSA,
-                    IREP_FOLDER_NAME_VLAN,
-                    0
-                );
-
-        pPoamIrepFoCOSA->EnableFileSync((ANSC_HANDLE)pPoamIrepFoCOSA, TRUE);
-    }
-
-    if ( !pPoamIrepFoVLAN )
-    {
-        returnStatus = ANSC_STATUS_FAILURE;
-
-        goto  EXIT;
-    }
-    else
-    {
-        pMyObject->hIrepFolderVLAN = (ANSC_HANDLE)pPoamIrepFoVLAN;
-    }
-
-    pPoamIrepFoVLANPt =
-        (PPOAM_IREP_FOLDER_OBJECT)pPoamIrepFoVLAN->GetFolder
-            (
-                (ANSC_HANDLE)pPoamIrepFoVLAN,
-                IREP_FOLDER_NAME_PORTTRIGGER
-            );
-
-    if ( !pPoamIrepFoVLANPt )
-    {
-        /* pPoamIrepFoCOSA->EnableFileSync((ANSC_HANDLE)pPoamIrepFoCOSA, FALSE); */
-
-        pPoamIrepFoVLANPt =
-            pPoamIrepFoCOSA->AddFolder
-                (
-                    (ANSC_HANDLE)pPoamIrepFoVLAN,
-                    IREP_FOLDER_NAME_PORTTRIGGER,
-                    0
-                );
-
-        /* pPoamIrepFoCOSA->EnableFileSync((ANSC_HANDLE)pPoamIrepFoCOSA, TRUE); */
-    }
-
-    if ( !pPoamIrepFoVLANPt )
-    {
-        returnStatus = ANSC_STATUS_FAILURE;
-
-        goto  EXIT;
-    }
-    else
-    {
-        pMyObject->hIrepFolderVLANPt = (ANSC_HANDLE)pPoamIrepFoVLANPt;
-    }
-
-    /* Retrieve the next instance number for Port Trigger */
-
-    if ( TRUE )
-    {
-        if ( pPoamIrepFoVLANPt )
-        {
-            pSlapVariable =
-                (PSLAP_VARIABLE)pPoamIrepFoVLANPt->GetRecord
-                    (
-                        (ANSC_HANDLE)pPoamIrepFoVLANPt,
-                        DML_RR_NAME_VLANNextInsNumber,
-                        NULL
-                    );
-
-            if ( pSlapVariable )
-            {
-                pMyObject->ulPtNextInstanceNumber = pSlapVariable->Variant.varUint32;
-
-                SlapFreeVariable(pSlapVariable);
-            }
-        }
-    }
-
-EXIT:
-
+    VlanTerminationInitialize( pMyObject );
     return returnStatus;
 }
 
@@ -392,41 +292,6 @@ VlanRemove
 {
     ANSC_STATUS                     returnStatus = ANSC_STATUS_SUCCESS;
     PDATAMODEL_VLAN                 pMyObject    = (PDATAMODEL_VLAN)hThisObject;
-    PSINGLE_LINK_ENTRY              pLink        = NULL;
-    PCONTEXT_LINK_OBJECT            pVLAN         = NULL;
-    PPOAM_IREP_FOLDER_OBJECT        pPoamIrepFo  = (PPOAM_IREP_FOLDER_OBJECT)pMyObject->hIrepFolderVLAN;
-    PPOAM_IREP_FOLDER_OBJECT        pPoamIrepPt  = (PPOAM_IREP_FOLDER_OBJECT)pMyObject->hIrepFolderVLANPt;
-
-
-
-    /* Remove resource of writable entry link */
-    for( pLink = AnscSListPopEntry(&pMyObject->VLANPMappingList); pLink; )
-    {
-        pVLAN = (PCONTEXT_LINK_OBJECT)ACCESS_CONTEXT_LINK_OBJECT(pLink);
-        pLink = AnscSListGetNextEntry(pLink);
-
-        AnscFreeMemory(pVLAN->hContext);
-        AnscFreeMemory(pVLAN);
-    }
-
-    for( pLink = AnscSListPopEntry(&pMyObject->Q_VlanList); pLink; )
-    {
-        pVLAN = (PCONTEXT_LINK_OBJECT)ACCESS_CONTEXT_LINK_OBJECT(pLink);
-        pLink = AnscSListGetNextEntry(pLink);
-
-        AnscFreeMemory(pVLAN->hContext);
-        AnscFreeMemory(pVLAN);
-    }
-
-    if ( pPoamIrepPt )
-    {
-        pPoamIrepPt->Remove( (ANSC_HANDLE)pPoamIrepPt);
-    }
-
-    if ( pPoamIrepFo )
-    {
-        pPoamIrepFo->Remove( (ANSC_HANDLE)pPoamIrepFo);
-    }
 
     /* Remove self */
     AnscFreeMemory((ANSC_HANDLE)pMyObject);
@@ -434,82 +299,3 @@ VlanRemove
     return returnStatus;
 }
 
-ANSC_STATUS
-VlanGen
-    (
-        ANSC_HANDLE                 hDml
-    )
-{
-    ANSC_STATUS                 returnStatus      = ANSC_STATUS_SUCCESS;
-    PDATAMODEL_VLAN             pVLAN             = (PDATAMODEL_VLAN)g_pBEManager->hVLAN;
-
-    /*
-            For dynamic and writable table, we don't keep the Maximum InstanceNumber.
-            If there is delay_added entry, we just jump that InstanceNumber.
-        */
-    do
-    {
-        pVLAN->MaxInstanceNumber++;
-
-        if ( pVLAN->MaxInstanceNumber <= 0 )
-        {
-            pVLAN->MaxInstanceNumber   = 1;
-        }
-
-        if ( !SListGetEntryByInsNum(&pVLAN->VLANPMappingList, pVLAN->MaxInstanceNumber) )
-        {
-            break;
-        }
-    }while(1);
-
-    //pEntry->InstanceNumber            = pVLAN->MaxInstanceNumber;
-
-    return returnStatus;
-}
-
-ANSC_STATUS
-VlanGenForTriggerEntry
-    (
-        ANSC_HANDLE    hDml,
-        PDML_VLAN      pEntry
-    )
-{
-    ANSC_STATUS                 returnStatus      = ANSC_STATUS_SUCCESS;
-    PDATAMODEL_VLAN             pVLAN             = (PDATAMODEL_VLAN)g_pBEManager->hVLAN;
-
-    /*
-            For dynamic and writable table, we don't keep the Maximum InstanceNumber.
-            If there is delay_added entry, we just jump that InstanceNumber.
-        */
-    do
-    {
-        if ( pVLAN->ulPtNextInstanceNumber == 0 )
-        {
-            pVLAN->ulPtNextInstanceNumber   = 1;
-        }
-
-        if ( !SListGetEntryByInsNum(&pVLAN->Q_VlanList, pVLAN->ulPtNextInstanceNumber) )
-        {
-            break;
-        }
-        else
-        {
-            pVLAN->ulPtNextInstanceNumber++;
-        }
-    }while(1);
-
-    pEntry->InstanceNumber            = pVLAN->ulPtNextInstanceNumber;
-
-    if ( pEntry->Alias[0] == '\0' )
-    {
-        _ansc_sprintf( pEntry->Alias, "VLAN_%d", pEntry->InstanceNumber );
-        DML_VLAN_INIT(pEntry);
-
-        _ansc_sprintf(pEntry->Name, "erouter%d", pEntry->InstanceNumber);
-        pEntry->Status = VLAN_IF_STATUS_NOT_PRESENT;
-    }
-
-    pVLAN->ulPtNextInstanceNumber++;
-
-    return returnStatus;
-}

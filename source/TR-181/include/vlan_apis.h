@@ -44,6 +44,20 @@
 /* * Telemetry Markers */
 #define VLAN_MARKER_VLAN_IF_CREATE          "RDKB_VLAN_CREATE"
 #define VLAN_MARKER_VLAN_IF_DELETE          "RDKB_VLAN_DELETE"
+#define PSM_VLANMANAGER_COUNT             "dmsb.vlanmanager.ifcount"
+#define PSM_VLANMANAGER_ENABLE            "dmsb.vlanmanager.%d.VlanEnable"
+#define PSM_VLANMANAGER_ALIAS             "dmsb.vlanmanager.%d.alias"
+#define PSM_VLANMANAGER_NAME              "dmsb.vlanmanager.%d.name"
+#define PSM_VLANMANAGER_LOWERLAYERS       "dmsb.vlanmanager.%d.lowerlayers"
+#define PSM_VLANMANAGER_VLANID            "dmsb.vlanmanager.%d.vlanid"
+#define PSM_VLANMANAGER_TPID              "dmsb.vlanmanager.%d.tpid"
+#define PSM_VLANMANAGER_BASEINTERFACE     "dmsb.vlanmanager.%d.baseinterface"
+
+#define CCSP_SUBSYS "eRT."
+#define PSM_VALUE_GET_VALUE(name, str) PSM_Get_Record_Value2(bus_handle, CCSP_SUBSYS, name, NULL, &(str))
+
+#define PSM_ENABLE_STRING_TRUE  "TRUE"
+#define PSM_ENABLE_STRING_FALSE  "FALSE"
 
 /***********************************
     Actual definition declaration
@@ -135,8 +149,7 @@ ANSC_STATUS
 DmlVlanInit
     (
         ANSC_HANDLE                 hDml,
-        PANSC_HANDLE                phContext,
-        PFN_DML_VLAN_GEN            pValueGenFn
+        PANSC_HANDLE                phContext
     );
 /* APIs for VLAN */
 

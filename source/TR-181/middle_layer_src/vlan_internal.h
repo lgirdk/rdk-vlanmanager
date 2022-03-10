@@ -60,6 +60,8 @@
     ANSC_HANDLE                     hIrepFolderVLANPt;                                       \
     ULONG                           ulVlanCfgInstanceNumber;                                 \
     PDML_VLAN_CFG                   VlanCfg;                                             \
+    ULONG                           ulVlantrInstanceNumber;                                 \
+    PDML_VLAN                       VlanTer;                                             \
 
 typedef  struct
 _DATAMODEL_VLAN

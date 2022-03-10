@@ -59,6 +59,8 @@
     UCHAR                           AliasOfPortMapping[64];                                 \
     ANSC_HANDLE                     hIrepFolderEthernet;                                    \
     ANSC_HANDLE                     hIrepFolderEthernetPt;                                  \
+    ULONG                           ulEthlinkInstanceNumber;                                \
+    PDML_ETHERNET                   EthLink;                                                \
 
 typedef  struct
 _DATAMODEL_ETHERNET

@@ -94,6 +94,8 @@
 
 #define HAL_CONNECTION_RETRY_MAX_COUNT 10
 
+#if 0
+//#ifdef _HUB4_PRODUCT_REQ_
 /* Intializer. */
 INT vlan_eth_hal_init()
 {
@@ -176,7 +178,6 @@ int vlan_eth_hal_createInterface(vlan_configuration_t *config)
     snprintf(param.value, sizeof(param.value), "%d", config->TPId);
     param.type = PARAM_UNSIGNED_INTEGER;
     json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
-#ifdef _HUB4_PRODUCT_REQ_
     for (int i = 0; i < (*config).skbMarkingNumOfEntries; ++i)
     {
         memset(&param, 0, sizeof(param));
@@ -191,7 +192,6 @@ int vlan_eth_hal_createInterface(vlan_configuration_t *config)
         param.type = PARAM_INTEGER;
         json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
     }
-#endif
     CcspTraceInfo(("JSON Request message = %s \n", json_object_to_json_string_ext(jmsg, JSON_C_TO_STRING_PRETTY)));
     if( json_hal_client_send_and_get_reply(jmsg, &jreply_msg) != RETURN_OK)
     {
@@ -228,7 +228,6 @@ int vlan_eth_hal_createInterface(vlan_configuration_t *config)
     return RETURN_OK;
 }
 
-#ifdef _HUB4_PRODUCT_REQ_
 /* vlan_eth_hal_setMarkings() */
 int vlan_eth_hal_setMarkings(vlan_configuration_t *config)
 {
@@ -319,7 +318,6 @@ int vlan_eth_hal_setMarkings(vlan_configuration_t *config)
 
     return RETURN_OK;
 }
-#endif //_HUB4_PRODUCT_REQ_
 
 /* vlan_eth_hal_deleteInterface() */
 int vlan_eth_hal_deleteInterface(char *ifname, int instanceNumber)
@@ -387,3 +385,4 @@ int vlan_eth_hal_deleteInterface(char *ifname, int instanceNumber)
 
     return RETURN_OK;
 }
+#endif //_HUB4_PRODUCT_REQ_

@@ -35,6 +35,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/sysinfo.h>
 #include "vlan_mgr_apis.h"
 #include "vlan_apis.h"
 #include "vlan_internal.h"
@@ -60,6 +61,32 @@ extern char                 g_Subsystem[32];
 extern  ANSC_HANDLE                        bus_handle;
 
 extern ANSC_STATUS DmlEthSetWanStatusForBaseManager(char *ifname, char *WanStatus);
+
+void get_uptime(long *uptime)
+{
+    struct sysinfo info;
+    sysinfo( &info );
+    *uptime= info.uptime;
+}
+
+ANSC_STATUS DmlEthDeleteVlanInterface(PDML_VLAN p_Vlan)
+{
+     char cmd[256] = {0};
+     char wan_interface[10] = {0};
+     char buff[10] =  {0};
+
+     if (NULL == p_Vlan)
+     {
+          CcspTraceError(("Error: Invalid arguement \n"));
+          return ANSC_STATUS_FAILURE;
+     }
+
+     snprintf(cmd, sizeof(cmd), "ip link delete %s", p_Vlan->Name);
+     v_secure_system(cmd);
+
+     return ANSC_STATUS_SUCCESS;
+}
+
 
 ANSC_STATUS
 SListPushEntryByInsNum
@@ -146,7 +173,6 @@ SListGetEntryByInsNum
             (
                 ANSC_HANDLE                 hDml,
                 PANSC_HANDLE                phContext,
-                PFN_COSA_DML_VLAN_GEN        pValueGenFn
             );
 
         Description:
@@ -155,7 +181,6 @@ SListGetEntryByInsNum
         Arguments:
             hDml               Opaque handle from DM adapter. Backend saves this handle for calling pValueGenFn.
              phContext       Opaque handle passed back from backend, needed by CosaDmlVLANXyz() routines.
-            pValueGenFn    Function pointer to instance number/alias generation callback.
 
         Return:
             Status of operation.
@@ -165,17 +190,18 @@ ANSC_STATUS
 DmlVlanInit
     (
         ANSC_HANDLE                 hDml,
-        PANSC_HANDLE                phContext,
-        PFN_DML_VLAN_GEN            pValueGenFn
+        PANSC_HANDLE                phContext
     )
 {
     ANSC_STATUS  returnStatus = ANSC_STATUS_SUCCESS;
 
+#if 0
+//#ifdef _HUB4_PRODUCT_REQ_
     returnStatus != vlan_eth_hal_init();
     if (returnStatus != ANSC_STATUS_SUCCESS) {
         printf("vlan_eth_hal_init failed \n");
     }
-
+#endif
     return returnStatus;
 }
 
@@ -432,6 +458,10 @@ DmlDeleteVlanInterface
             return ANSC_STATUS_FAILURE;
         }
 
+        DmlEthDeleteVlanInterface(pEntry);
+
+#if 0
+//#ifdef _HUB4_PRODUCT_REQ_
         if ( ( status != VLAN_IF_NOTPRESENT ) && ( status != VLAN_IF_ERROR ) )
         {
             returnStatus = vlan_eth_hal_deleteInterface(pEntry->Name, pEntry->InstanceNumber);
@@ -446,6 +476,7 @@ DmlDeleteVlanInterface
         {
             CcspTraceInfo(("%s - No VLAN interface found with this name %s\n", __FUNCTION__, pEntry->Name));
         }
+#endif //_HUB4_PRODUCT_REQ_
     }
 
     return returnStatus;
@@ -508,6 +539,8 @@ DmlSetVlan
                 return ANSC_STATUS_FAILURE;
             }
 
+#if 0
+//#ifdef _HUB4_PRODUCT_REQ_
             if ( ( status != VLAN_IF_NOTPRESENT ) && ( status != VLAN_IF_ERROR ) )
             {
                 CcspTraceInfo(("%s %s:VLAN interface(%s) already exists, delete it first\n", __FUNCTION__, VLAN_MARKER_VLAN_IF_CREATE, vlan_conf.L3Interface));
@@ -520,6 +553,7 @@ DmlSetVlan
 
                 CcspTraceInfo(("%s - %s:Successfully deleted VLAN interface %s\n", __FUNCTION__, VLAN_MARKER_VLAN_IF_DELETE, vlan_conf.L3Interface));
             }
+#endif //_HUB4_PRODUCT_REQ_
 
             returnStatus = VlanManager_SetVlanMarkings(pEntry->Alias, &vlan_conf, TRUE);
             if (ANSC_STATUS_SUCCESS != returnStatus)
@@ -537,16 +571,18 @@ DmlSetVlan
                     CcspTraceError(("[%s][%d] getInterfaceStatus failed for %s !! \n", __FUNCTION__, __LINE__, vlan_conf.L3Interface));
                     return ANSC_STATUS_FAILURE;
                 }
-                if (status == VLAN_IF_UP)
+
+                if (VLAN_IF_UP == status)
                 {
-                    //Needs to inform base interface is UP after vlan creation
-                    DmlEthSendWanStatusForBaseManager(pEntry->BaseInterface, "Up");
                     break;
                 }
 
                 iIterator++;
                 sleep(2);
             }
+            long uptime = 0;
+            get_uptime(&uptime);
+            pEntry->LastChange  =  uptime;
         }
     }
 
