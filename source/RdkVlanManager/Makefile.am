@@ -48,6 +48,6 @@ VlanManager_DEPENDENCIES = \
         ${top_builddir}/source/TR-181/middle_layer_src/libRdkVlanManager_middle_layer_src.la
 
 VlanManager_CFLAGS = -DFEATURE_SUPPORT_RDKLOG $(DBUS_CFLAGS) $(SYSTEMD_CFLAGS)
-VlanManager_SOURCES = ssp_action.c ssp_messagebus_interface.c ssp_main.c
+VlanManager_SOURCES = ssp_action.c ssp_messagebus_interface.c ssp_main.c dm_pack_datamodel.c
 VlanManager_LDFLAGS = -lccsp_common -lrdkloggers -lprivilege $(DBUS_LIBS) $(SYSTEMD_LDFLAGS) -lbreakpadwrapper
 VlanManager_LDADD = $(VlanManager_DEPENDENCIES)
