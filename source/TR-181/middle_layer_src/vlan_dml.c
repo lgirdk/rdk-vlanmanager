@@ -231,7 +231,7 @@ Vlan_GetParamBoolValue
     PDML_VLAN                  p_Vlan        = (PDML_VLAN   )hInsContext;
 
     /* check the parameter name and return the corresponding value */
-    if( AnscEqualString(ParamName, "Enable", TRUE))
+    if (strcmp(ParamName, "Enable") == 0)
     {
         *pBool = p_Vlan->Enable;
         return TRUE;
@@ -284,7 +284,7 @@ Vlan_GetParamIntValue
     PDML_VLAN              p_Vlan    = (PDML_VLAN   )hInsContext;
 
     /* check the parameter name and return the corresponding value */
-    if( AnscEqualString(ParamName, "VLANID", TRUE))
+    if (strcmp(ParamName, "VLANID") == 0)
     {
         *pInt = p_Vlan->VLANId;
         return TRUE;
@@ -341,21 +341,21 @@ Vlan_GetParamUlongValue
         return FALSE;
     }
 
-    if( AnscEqualString(ParamName, "Status", TRUE))
+    if (strcmp(ParamName, "Status") == 0)
     {
         if(ANSC_STATUS_SUCCESS == Vlan_GetStatus(p_Vlan)) {
             *puLong = p_Vlan->Status;
         }
         return TRUE;
     }
-    if( AnscEqualString(ParamName, "LastChange", TRUE))
+    if (strcmp(ParamName, "LastChange") == 0)
     {
         long cur_time = 0;
         get_uptime(&cur_time);
         *puLong = AnscGetTimeIntervalInSeconds(p_Vlan->LastChange, cur_time);
         return TRUE;
     }
-    if( AnscEqualString(ParamName, "TPID", TRUE))
+    if (strcmp(ParamName, "TPID") == 0)
     {
         *puLong = p_Vlan->TPId;
         return TRUE;
@@ -416,7 +416,7 @@ Vlan_GetParamStringValue
     PUCHAR                pString       = NULL;
 
     /* check the parameter name and return the corresponding value */
-    if( AnscEqualString(ParamName, "Alias", TRUE))
+    if (strcmp(ParamName, "Alias") == 0)
     {
         if ( AnscSizeOfString(p_Vlan->Alias) < *pUlSize)
         {
@@ -429,17 +429,17 @@ Vlan_GetParamStringValue
             return 1;
         }
     }
-    if( AnscEqualString(ParamName, "Name", TRUE))
+    if (strcmp(ParamName, "Name") == 0)
     {
         AnscCopyString(pValue, p_Vlan->Name);
         return 0;
     }
-    if( AnscEqualString(ParamName, "LowerLayers", TRUE))
+    if (strcmp(ParamName, "LowerLayers") == 0)
     {
         AnscCopyString(pValue, p_Vlan->LowerLayers);
         return 0;
     }
-    if( AnscEqualString(ParamName, "X_RDK_BaseInterface", TRUE))
+    if (strcmp(ParamName, "X_RDK_BaseInterface") == 0)
     {
         AnscCopyString(pValue, p_Vlan->BaseInterface);
         return 0;
@@ -494,7 +494,7 @@ Vlan_SetParamBoolValue
     pthread_t VlanThreadId;
     void * (*VlanHandleThread)(void *);
     /* check the parameter name and set the corresponding value */
-    if( AnscEqualString(ParamName, "Enable", TRUE))
+    if (strcmp(ParamName, "Enable") == 0)
     {
         //Check whether enable param changed or not
         if( bValue == p_Vlan->Enable )
@@ -566,7 +566,7 @@ Vlan_SetParamIntValue
 {
     PDML_VLAN              p_Vlan    = (PDML_VLAN   )hInsContext;
 
-    if( AnscEqualString(ParamName, "VLANID", TRUE))
+    if (strcmp(ParamName, "VLANID") == 0)
     {
         p_Vlan->VLANId = iValue;
         return TRUE;
@@ -618,12 +618,12 @@ Vlan_SetParamUlongValue
     PDML_VLAN                  p_Vlan     = (PDML_VLAN   )hInsContext;
 
     /* check the parameter name and set the corresponding value */
-    if( AnscEqualString(ParamName, "LastChange", TRUE))
+    if (strcmp(ParamName, "LastChange") == 0)
     {
         p_Vlan->LastChange = uValue;
         return TRUE;
     }
-    if( AnscEqualString(ParamName, "TPID", TRUE))
+    if (strcmp(ParamName, "TPID") == 0)
     {
         p_Vlan->TPId = uValue;
         return TRUE;
@@ -677,22 +677,22 @@ Vlan_SetParamStringValue
 
     /* check the parameter name and set the corresponding value */
    
-    if( AnscEqualString(ParamName, "Alias", TRUE))
+    if (strcmp(ParamName, "Alias") == 0)
     {
         AnscCopyString(p_Vlan->Alias, pString);
         return TRUE;
     }
-    if( AnscEqualString(ParamName, "Name", TRUE))
+    if (strcmp(ParamName, "Name") == 0)
     {
         AnscCopyString(p_Vlan->Name, pString);
         return TRUE;
     }
-    if( AnscEqualString(ParamName, "LowerLayers", TRUE))
+    if (strcmp(ParamName, "LowerLayers") == 0)
     {
         AnscCopyString(p_Vlan->LowerLayers, pString);
         return TRUE;
     }
-    if( AnscEqualString(ParamName, "X_RDK_BaseInterface", TRUE))
+    if (strcmp(ParamName, "X_RDK_BaseInterface") == 0)
     {
         AnscCopyString(p_Vlan->BaseInterface, pString);
         return TRUE;
