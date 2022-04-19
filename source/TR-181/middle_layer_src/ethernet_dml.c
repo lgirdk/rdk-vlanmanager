@@ -354,19 +354,19 @@ EthLink_GetParamBoolValue
     PDML_ETHERNET              p_EthLink  = (PDML_ETHERNET   )pCxtLink->hContext;
 
     /* check the parameter name and return the corresponding value */
-    if( AnscEqualString(ParamName, "Enable", TRUE))
+    if (strcmp(ParamName, "Enable") == 0)
     {
         *pBool = p_EthLink->Enable;
         return TRUE;
     }
 
-    if( AnscEqualString(ParamName, "PriorityTagging", TRUE))
+    if (strcmp(ParamName, "PriorityTagging") == 0)
     {
         *pBool = p_EthLink->PriorityTagging;
         return TRUE;
     }
 
-    if( AnscEqualString(ParamName, "X_RDK_Refresh", TRUE))
+    if (strcmp(ParamName, "X_RDK_Refresh") == 0)
     {
         *pBool = FALSE;
         return TRUE;
@@ -420,7 +420,7 @@ EthLink_GetParamUlongValue
 
     /* check the parameter name and return the corresponding value */
 
-    if( AnscEqualString(ParamName, "Status", TRUE))
+    if (strcmp(ParamName, "Status") == 0)
     {
         if(ANSC_STATUS_SUCCESS == DmlGetEthCfgIfStatus(NULL, p_EthLink)) {
             *puLong = p_EthLink->Status;
@@ -485,7 +485,7 @@ EthLink_GetParamStringValue
     PUCHAR                     pString       = NULL;
 
     /* check the parameter name and return the corresponding value */
-    if( AnscEqualString(ParamName, "Alias", TRUE))
+    if (strcmp(ParamName, "Alias") == 0)
     {
         if ( AnscSizeOfString(p_EthLink->Alias) < *pUlSize)
         {
@@ -498,7 +498,7 @@ EthLink_GetParamStringValue
             return 1;
         }
     }
-    if( AnscEqualString(ParamName, "Name", TRUE))
+    if (strcmp(ParamName, "Name") == 0)
     {
         if ( AnscSizeOfString(p_EthLink->Name) < *pUlSize)
         {
@@ -511,7 +511,7 @@ EthLink_GetParamStringValue
             return 1;
         }
     }
-    if( AnscEqualString(ParamName, "LowerLayers", TRUE))
+    if (strcmp(ParamName, "LowerLayers") == 0)
     {
         if ( AnscSizeOfString(p_EthLink->LowerLayers) < *pUlSize)
         {   
@@ -526,7 +526,7 @@ EthLink_GetParamStringValue
 
         return 0;
     }
-    if( AnscEqualString(ParamName, "MACAddress", TRUE))
+    if (strcmp(ParamName, "MACAddress") == 0)
     {
         //Get MAC from corresponding interface
         DmlGetHwAddressUsingIoctl( p_EthLink->Name, p_EthLink->MACAddress, sizeof(p_EthLink->MACAddress) );
@@ -545,7 +545,7 @@ EthLink_GetParamStringValue
         AnscCopyString(pValue, p_EthLink->MACAddress);
         return 0;
     }
-    if( AnscEqualString(ParamName, "X_RDK_BaseInterface", TRUE))
+    if (strcmp(ParamName, "X_RDK_BaseInterface") == 0)
     {
         if ( AnscSizeOfString(p_EthLink->BaseInterface) < *pUlSize)
         {   
@@ -608,7 +608,7 @@ EthLink_SetParamBoolValue
     PDML_ETHERNET             p_EthLink  = (PDML_ETHERNET) pCxtLink->hContext;
 
     /* check the parameter name and set the corresponding value */
-    if( AnscEqualString(ParamName, "Enable", TRUE))
+    if (strcmp(ParamName, "Enable") == 0)
     {
         //Check whether enable param changed or not
         if( bValue == p_EthLink->Enable )
@@ -631,13 +631,13 @@ EthLink_SetParamBoolValue
         return TRUE;
     }
 
-    if( AnscEqualString(ParamName, "PriorityTagging", TRUE))
+    if (strcmp(ParamName, "PriorityTagging") == 0)
     {
         p_EthLink->PriorityTagging = bValue;
         return TRUE;
     }
 
-    if( AnscEqualString(ParamName, "X_RDK_Refresh", TRUE))
+    if (strcmp(ParamName, "X_RDK_Refresh") == 0)
     {
 #ifdef _HUB4_PRODUCT_REQ_
         //Handle Ethernet Link Refresh
@@ -760,27 +760,27 @@ EthLink_SetParamStringValue
 
     /* check the parameter name and set the corresponding value */
    
-    if( AnscEqualString(ParamName, "Alias", TRUE))
+    if (strcmp(ParamName, "Alias") == 0)
     {
         AnscCopyString(p_EthLink->Alias, pString);
         return TRUE;
     }
-    if( AnscEqualString(ParamName, "Name", TRUE))
+    if (strcmp(ParamName, "Name") == 0)
     {
         AnscCopyString(p_EthLink->Name, pString);
         return TRUE;
     }
-    if( AnscEqualString(ParamName, "LowerLayers", TRUE))
+    if (strcmp(ParamName, "LowerLayers") == 0)
     {
         AnscCopyString(p_EthLink->LowerLayers, pString);
         return TRUE;
     }
-    if( AnscEqualString(ParamName, "MACAddress", TRUE))
+    if (strcmp(ParamName, "MACAddress") == 0)
     {
         AnscCopyString(p_EthLink->MACAddress, pString);
         return TRUE;
     }
-    if( AnscEqualString(ParamName, "X_RDK_BaseInterface", TRUE))
+    if (strcmp(ParamName, "X_RDK_BaseInterface") == 0)
     {
         AnscCopyString(p_EthLink->BaseInterface, pString);
         return TRUE;
@@ -1135,7 +1135,7 @@ Marking_GetParamUlongValue
     }
 
     /* check the parameter name and return the corresponding value */
-    if( AnscEqualString(ParamName, "SKBPort", TRUE))
+    if (strcmp(ParamName, "SKBPort") == 0)
     {
         *puLong = p_EthMarking->SKBPort;
         return TRUE;
@@ -1190,7 +1190,7 @@ Marking_GetParamIntValue
         return FALSE;
     }
     /* check the parameter name and return the corresponding value */
-    if( AnscEqualString(ParamName, "EthernetPriorityMark", TRUE))
+    if (strcmp(ParamName, "EthernetPriorityMark") == 0)
     {
         *pInt =  p_EthMarking->EthernetPriorityMark;
         return TRUE;
