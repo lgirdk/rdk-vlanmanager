@@ -80,7 +80,7 @@ LONG VlanCfg_GetParamStringValue ( ANSC_HANDLE hInsContext, char* ParamName, cha
         return -1;
     }
 
-    if( AnscEqualString(ParamName, "Region", TRUE))
+    if (strcmp(ParamName, "Region") == 0)
     {
         AnscCopyString(pValue, pVlanCfg->Region);
         return 0;
@@ -100,7 +100,7 @@ BOOL VlanCfg_SetParamStringValue ( ANSC_HANDLE hInsContext, char* ParamName, cha
         return FALSE;
     }
 
-    if( AnscEqualString(ParamName, "Region", TRUE))
+    if (strcmp(ParamName, "Region") == 0)
     {
           AnscCopyString(pVlanCfg->Region, pString);
          return TRUE;
@@ -120,18 +120,18 @@ BOOL VlanCfg_GetParamUlongValue ( ANSC_HANDLE hInsContext, char* ParamName, ULON
         return FALSE;
     }
 
-    if( AnscEqualString(ParamName, "VLANId", TRUE))
+    if (strcmp(ParamName, "VLANId") == 0)
     {
          *pValue = pVlanCfg->VLANId;
          return TRUE;
     }
-    if( AnscEqualString(ParamName, "InterfaceType", TRUE))
+    if (strcmp(ParamName, "InterfaceType") == 0)
     {
         *pValue =  pVlanCfg->InterfaceType;
         return TRUE;
     }
 
-    else if( AnscEqualString(ParamName, "TPId", TRUE))
+    else if (strcmp(ParamName, "TPId") == 0)
     {
         *pValue = pVlanCfg->TPId;
         return TRUE;
@@ -151,17 +151,17 @@ BOOL VlanCfg_SetParamUlongValue ( ANSC_HANDLE hInsContext, char* ParamName, ULON
     {
         return FALSE;
     }
-    if( AnscEqualString(ParamName, "VLANId", TRUE))
+    if (strcmp(ParamName, "VLANId") == 0)
     {
          pVlanCfg->VLANId = uValue;
          return TRUE;
     }
-    else if( AnscEqualString(ParamName, "TPId", TRUE))
+    else if (strcmp(ParamName, "TPId") == 0)
     {
         pVlanCfg->TPId = uValue;
         return TRUE;
     }
-    else if( AnscEqualString(ParamName, "InterfaceType", TRUE))
+    else if (strcmp(ParamName, "InterfaceType") == 0)
     {
         pVlanCfg->InterfaceType = uValue;
         return TRUE;
