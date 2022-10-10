@@ -253,7 +253,6 @@ int main(int argc, char* argv[])
     appcaps.user_name = NULL;
     char buf[8] = {'\0'};
 
-    syscfg_init();
     bool blocklist_ret = false;
     blocklist_ret = isBlocklisted();
     if(blocklist_ret)
