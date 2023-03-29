@@ -522,16 +522,13 @@ EthLink_SetParamBoolValue
         {
             if (p_EthLink->Enable == TRUE)
             {
-                //Add Marking
-                if (EthLink_AddMarking(p_EthLink) == ANSC_STATUS_FAILURE)
+                INT iErrorCode = -1;
+                pthread_t VlanThreadId;
+
+                iErrorCode = pthread_create( &VlanThreadId, NULL, &EthLink_RefreshHandleThread, (void *)p_EthLink );
+                if( 0 != iErrorCode )
                 {
-                    CcspTraceError(("[%s-%d] Failed to Update Refreshed Marking \n", __FUNCTION__, __LINE__));
-                    return FALSE;
-                }
-                //Trigger Vlan Refresh
-                if (EthLink_TriggerVlanRefresh(p_EthLink) == ANSC_STATUS_FAILURE)
-                {
-                    CcspTraceError(("[%s-%d] Failed to Trigger Vlan Refresh \n", __FUNCTION__, __LINE__));
+                    CcspTraceInfo(("%s %d - Failed to Start VLAN Refresh thread EC:%d\n", __FUNCTION__, __LINE__, iErrorCode ));
                     return FALSE;
                 }
             }

@@ -490,6 +490,9 @@ Vlan_SetParamBoolValue
 {
 
     PDML_VLAN                  p_Vlan    = (PDML_VLAN) hInsContext;
+    INT iErrorCode = -1;
+    pthread_t VlanThreadId;
+    void * (*VlanHandleThread)(void *);
     /* check the parameter name and set the corresponding value */
     if( AnscEqualString(ParamName, "Enable", TRUE))
     {
@@ -504,13 +507,18 @@ Vlan_SetParamBoolValue
 
         if(!p_Vlan->Enable)
         {
-            Vlan_Disable(p_Vlan);
+            VlanHandleThread = &Vlan_Disable;
         }
         else
         {
-            Vlan_Enable(p_Vlan);
+            VlanHandleThread = &Vlan_Enable;
         }
-
+        iErrorCode = pthread_create( &VlanThreadId, NULL, VlanHandleThread, (void *)p_Vlan );
+        if( 0 != iErrorCode )
+        {
+            CcspTraceInfo(("%s %d - Failed to Start VLAN Enable/Disable thread EC:%d\n", __FUNCTION__, __LINE__, iErrorCode ));
+            return FALSE;
+        }
         return TRUE;
     }
 

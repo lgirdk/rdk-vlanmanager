@@ -272,6 +272,17 @@ static ANSC_STATUS VlanTerminationInitialize( ANSC_HANDLE hThisObject)
             {
                 pVlan[nIndex].TPId = atoi(acPSMValue) ;
             }
+
+            /*TODO:
+             *Need to be Removed Path From PSM Once RBUS Support Available in VlanManager and WanManager.
+             */
+            memset(acPSMQuery, 0, sizeof(acPSMQuery));
+            memset(acPSMValue, 0, sizeof(acPSMValue));
+            snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_PATH, nIndex + 1 );
+            if ( CCSP_SUCCESS == DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue ) )
+            {
+                strcpy(pVlan[nIndex].Path, acPSMValue);
+            }
         }
         pMyObject->VlanTer = pVlan;
         returnStatus = ANSC_STATUS_SUCCESS;
@@ -360,6 +371,15 @@ static ANSC_STATUS VlanTerminationInitialize( ANSC_HANDLE hThisObject)
         if ( CCSP_SUCCESS == DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue ) )
         {
              strcpy(pVlan[nIndex].BaseInterface,acPSMValue);
+        }
+
+         /*TODO:
+          *Need to be Removed Path From PSM Once RBUS Support Available in VlanManager and WanManager.
+          */
+        snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_VLANMANAGER_PATH, nIndex + 1 );
+        if ( CCSP_SUCCESS == DmlVlanGetPSMRecordValue( acPSMQuery, acPSMValue ) )
+        {
+             strcpy(pVlan[nIndex].Path,acPSMValue);
         }
      }
 

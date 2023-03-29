@@ -64,6 +64,7 @@ extern ANSC_HANDLE bus_handle;
 #define PSM_ETHLINK_LOWERLAYERS  "dmsb.ethlink.%d.lowerlayers"
 #define PSM_ETHLINK_MACOFFSET    "dmsb.ethlink.%d.macoffset"
 #define PSM_ETHLINK_BASEIFACE    "dmsb.ethlink.%d.baseiface"
+#define PSM_ETHLINK_PATH         "dmsb.ethlink.%d.path"
 
 //PAM
 #define RDKB_PAM_COMPONENT_NAME           "eRT.com.cisco.spvtg.ccsp.pam"
@@ -106,9 +107,9 @@ _DML_ETHERNET
     CHAR                 Alias[64];
     CHAR                 Name[64];
     CHAR                 BaseInterface[64];
-    CHAR                 Path[128];
     UINT                 LastChange;
     CHAR                 LowerLayers[1024];
+    CHAR                 Path[1024];
     CHAR                 MACAddress[18];
     ULONG                MACAddrOffSet;
     BOOLEAN              PriorityTagging;
@@ -167,10 +168,9 @@ EthLink_Disable
         PDML_ETHERNET               p_Eth
     ); 
 
-ANSC_STATUS EthLink_TriggerVlanRefresh( PDML_ETHERNET pEntry );
+void* EthLink_RefreshHandleThread(void *Arg);
 ANSC_STATUS EthLink_GetMacAddr( PDML_ETHERNET pEntry );
-ANSC_STATUS EthLink_SendWanStatusForBaseManager(char *ifname, char *WanStatus);
-ANSC_STATUS EthLink_AddMarking(PDML_ETHERNET pEntry);
+ANSC_STATUS EthLink_SendVirtualIfaceVlanStatus(char *path, char *vlanStatus);
 ANSC_STATUS DmlEthGetParamValues(char *pComponent, char *pBus, char *pParamName, char *pReturnVal);
 ANSC_STATUS EthLink_GetMarking(char *ifname, vlan_configuration_t *pVlanCfg);
 #endif

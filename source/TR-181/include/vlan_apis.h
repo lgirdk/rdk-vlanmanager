@@ -50,6 +50,7 @@
 #define PSM_VLANMANAGER_VLANID            "dmsb.vlanmanager.%d.vlanid"
 #define PSM_VLANMANAGER_TPID              "dmsb.vlanmanager.%d.tpid"
 #define PSM_VLANMANAGER_BASEINTERFACE     "dmsb.vlanmanager.%d.baseinterface"
+#define PSM_VLANMANAGER_PATH              "dmsb.vlanmanager.%d.path"
 
 #define CCSP_SUBSYS "eRT."
 #define PSM_VALUE_GET_VALUE(name, str) PSM_Get_Record_Value2(bus_handle, CCSP_SUBSYS, name, NULL, &(str))
@@ -84,8 +85,9 @@ _DML_VLAN
     UINT                 LastChange;
     CHAR                 LowerLayers[1024];
     CHAR                 BaseInterface[64];
-    INT                 VLANId;
+    INT                  VLANId;
     UINT                 TPId;
+    CHAR                 Path[1024];
 }
 DML_VLAN,  *PDML_VLAN;
 
@@ -120,17 +122,8 @@ Vlan_GetStatus
         PDML_VLAN                   p_Vlan
     );
 
-ANSC_STATUS
-Vlan_Enable
-    (
-        PDML_VLAN                   p_Vlan
-    );
-
-ANSC_STATUS
-Vlan_Disable
-    (
-        PDML_VLAN                   p_Vlan
-    );
+void * Vlan_Enable(void *Arg);
+void * Vlan_Disable(void *Arg);
 
 void get_uptime(long *uptime);
 #endif

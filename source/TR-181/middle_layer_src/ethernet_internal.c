@@ -209,6 +209,15 @@ static ANSC_STATUS EthLink_Initialize( ANSC_HANDLE hThisObject)
          {
              pEthCfg[nIndex].MACAddrOffSet = atoi(acPSMValue);
          }
+         /*TODO:
+	  *Need to be Removed Path From PSM Once RBUS Support Available in VlanManager and WanManager.
+	  */
+         snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_ETHLINK_PATH,nIndex + 1 );
+         ret = DmlEthGetPSMRecordValue( acPSMQuery, acPSMValue )   ;
+         if ( ret == 0)
+         {
+              strcpy(pEthCfg[nIndex].Path, acPSMValue);
+         }
     }
     pMyObject->EthLink = pEthCfg;
 

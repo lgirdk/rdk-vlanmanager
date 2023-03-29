@@ -64,7 +64,7 @@ extern token_t sysevent_token;
 
 static ANSC_STATUS Vlan_CreateTaggedInterface(PDML_VLAN pEntry);
 static ANSC_STATUS Vlan_SetEthLink(PDML_VLAN pEntry, BOOL enable, BOOL PriTag);
-extern ANSC_STATUS EthLink_SendWanStatusForBaseManager(char *ifname, char *WanStatus);
+extern ANSC_STATUS EthLink_SendVirtualIfaceVlanStatus(char *path, char *vlanStatus);
 #if !defined(VLAN_MANAGER_HAL_ENABLED)
 static ANSC_STATUS Vlan_DeleteInterface(PDML_VLAN p_Vlan);
 static ANSC_STATUS Vlan_SetMacAddr(PDML_VLAN pEntry);
@@ -350,11 +350,20 @@ void mapt_ivi_check() {
 }
 #endif
 
-ANSC_STATUS Vlan_Disable(PDML_VLAN pEntry)
+void * Vlan_Disable(void *Arg)
 {
     ANSC_STATUS returnStatus = ANSC_STATUS_SUCCESS;
     int ret;
     vlan_link_status_e status;
+
+    PDML_VLAN pEntry = (PDML_VLAN)Arg;
+    if ( NULL == pEntry )
+    {
+        CcspTraceError(("%s-%d: Failed, pEntry Arument is Null\n", __FUNCTION__, __LINE__));
+        pthread_exit(NULL);
+    }
+
+    pthread_detach(pthread_self());
 
     //Set EthLink to False. it will take care UnTagged Created Vlan Interface
     if (Vlan_SetEthLink(pEntry, FALSE, FALSE) == ANSC_STATUS_FAILURE)
@@ -379,7 +388,6 @@ ANSC_STATUS Vlan_Disable(PDML_VLAN pEntry)
         if (ret != ANSC_STATUS_SUCCESS)
         {
             CcspTraceError(("[%s][%d] %s: Failed to get vlan interface status \n", __FUNCTION__, __LINE__, pEntry->Name));
-            return ANSC_STATUS_FAILURE;
         }
 #if defined(VLAN_MANAGER_HAL_ENABLED)
         if ( ( status != VLAN_IF_NOTPRESENT ) && ( status != VLAN_IF_ERROR ) )
@@ -388,9 +396,7 @@ ANSC_STATUS Vlan_Disable(PDML_VLAN pEntry)
             if ( ANSC_STATUS_SUCCESS != returnStatus )
             {
                 CcspTraceError(("%s - Failed to delete VLAN interface %s\n", __FUNCTION__, pEntry->Name));
-                return returnStatus;
             }
-            CcspTraceInfo(("%s - %s:Successfully deleted VLAN interface %s\n", __FUNCTION__, VLAN_MARKER_VLAN_IF_CREATE, pEntry->Name));
         }
         else
         {
@@ -401,8 +407,11 @@ ANSC_STATUS Vlan_Disable(PDML_VLAN pEntry)
 #endif
     }
     pEntry->Status = VLAN_IF_DOWN;
+    EthLink_SendVirtualIfaceVlanStatus(pEntry->Path, "Down");
+    CcspTraceInfo(("%s - %s:Successfully deleted VLAN interface %s\n", __FUNCTION__, VLAN_MARKER_VLAN_IF_CREATE, pEntry->Name));
 
-    return returnStatus;
+    pthread_exit(NULL);
+
 }
 
 #if !defined(VLAN_MANAGER_HAL_ENABLED)
@@ -581,17 +590,20 @@ static ANSC_STATUS Vlan_CreateTaggedInterface(PDML_VLAN pEntry)
 }
 #endif
 
-ANSC_STATUS Vlan_Enable(PDML_VLAN pEntry)
+void * Vlan_Enable(void *Arg)
 {
     ANSC_STATUS returnStatus  = ANSC_STATUS_SUCCESS;
     vlan_link_status_e status;
     INT iIterator = 0;
 
-    if (pEntry == NULL)
+    PDML_VLAN pEntry = (PDML_VLAN)Arg;
+    if ( NULL == pEntry )
     {
-        CcspTraceError(("%s-%d: Failed to Enable Vlan\n", __FUNCTION__, __LINE__));
-        return ANSC_STATUS_FAILURE;
+        CcspTraceError(("%s-%d: Failed, pEntry Arument is Null\n", __FUNCTION__, __LINE__));
+        pthread_exit(NULL);
     }
+
+    pthread_detach(pthread_self());
 
     //Create Vlan Tagged Interface
     if(pEntry->VLANId > 0) {
@@ -603,7 +615,6 @@ ANSC_STATUS Vlan_Enable(PDML_VLAN pEntry)
         if (Vlan_GetTaggedVlanInterfaceStatus(pEntry->Name, &status) != ANSC_STATUS_SUCCESS)
         {
             CcspTraceError(("[%s][%d]Failed to get vlan interface status \n", __FUNCTION__, __LINE__));
-            return ANSC_STATUS_FAILURE;
         }
 #if defined(VLAN_MANAGER_HAL_ENABLED)
         if ( ( status != VLAN_IF_NOTPRESENT ) && ( status != VLAN_IF_ERROR ) )
@@ -613,7 +624,6 @@ ANSC_STATUS Vlan_Enable(PDML_VLAN pEntry)
             if (ANSC_STATUS_SUCCESS != returnStatus)
             {
                 CcspTraceError(("%s - Failed to delete the existing VLAN interface %s\n", __FUNCTION__, pEntry->Name));
-                return returnStatus;
             }
             CcspTraceInfo(("%s - %s:Successfully deleted VLAN interface %s\n", __FUNCTION__, VLAN_MARKER_VLAN_IF_DELETE, pEntry->Name));
         }
@@ -623,7 +633,6 @@ ANSC_STATUS Vlan_Enable(PDML_VLAN pEntry)
         {
             pEntry->Status = VLAN_IF_ERROR;
             CcspTraceError(("[%s][%d]Failed to create VLAN Tagged interface \n", __FUNCTION__, __LINE__));
-            return returnStatus;
         }
 
         //Get status of VLAN link
@@ -632,16 +641,12 @@ ANSC_STATUS Vlan_Enable(PDML_VLAN pEntry)
             if (ANSC_STATUS_FAILURE == Vlan_GetTaggedVlanInterfaceStatus(pEntry->Name, &status))
             {
                 CcspTraceError(("%s-%d: Failed to get Tagged Vlan Interface=%s Status \n", __FUNCTION__, __LINE__, pEntry->Name));
-                return ANSC_STATUS_FAILURE;
             }
 
             if (VLAN_IF_UP == status)
             {
-                /*TODO:
-		 * Need to be Reviewed after Unification is finalised.
-		 */
-                EthLink_SendWanStatusForBaseManager(pEntry->Alias, "Up");
-                CcspTraceInfo(("%s-%d: Successfully Updated WanStatus for Interface(%s) \n", __FUNCTION__, __LINE__, pEntry->Name));
+                EthLink_SendVirtualIfaceVlanStatus(pEntry->Path, "Up");
+                CcspTraceInfo(("%s-%d: Successfully Updated Vlan Status to WanManager for Interface(%s) \n", __FUNCTION__, __LINE__, pEntry->Name));
                 break;
             }
 
@@ -662,5 +667,6 @@ ANSC_STATUS Vlan_Enable(PDML_VLAN pEntry)
     }
     pEntry->Status = VLAN_IF_UP;
 
-    return returnStatus;
+    pthread_exit(NULL);
+
 }

@@ -102,9 +102,10 @@ static ANSC_STATUS EthLink_CreateUnTaggedInterface(PDML_ETHERNET pEntry);
 /*TODO
 * Need to be Reviewed after Unification finalised.
 */
-static ANSC_STATUS EthLink_SendLinkStatusForWanManager(char *ifname, char *LinkStatus);
 static ANSC_STATUS EthLink_GetLowerLayersInstanceFromEthAgent(char *ifname, INT *piInstanceNumber);
 static ANSC_STATUS EthLink_CreateMarkingTable(PDML_ETHERNET pEntry, vlan_configuration_t* pVlanCfg);
+static ANSC_STATUS EthLink_AddMarking(PDML_ETHERNET pEntry);
+static ANSC_STATUS EthLink_TriggerVlanRefresh(PDML_ETHERNET pEntry );
 #if !defined(VLAN_MANAGER_HAL_ENABLED)
 static ANSC_STATUS EthLink_SetEgressQoSMap( vlan_configuration_t *pVlanCfg );
 #endif
@@ -214,107 +215,21 @@ EthLink_GetStatus
     return returnStatus;
 }
 
-/* Set wan status event to Eth or DSL Agent */
-static ANSC_STATUS EthLink_SendLinkStatusForWanManager(char *ifname, char *LinkStatus)
+/* Set Wan Virtual Interface Vlan Status */
+ANSC_STATUS EthLink_SendVirtualIfaceVlanStatus(char *path, char *vlanStatus)
 {
     char acSetParamName[DATAMODEL_PARAM_LENGTH] = {0};
-    INT iWANInstance = -1;
 
-    if ((NULL == ifname) || (NULL == LinkStatus))
+    if ((NULL == path) || (strlen(path) <= 0) || (NULL == vlanStatus))
     {
-        CcspTraceError(("%s Invalid Memory\n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
-/*TODO
- * Need to be Reviewed. Hardcoded WAN Interface Instance for DSL and WANOE. 
- */
-#if defined(_HUB4_PRODUCT_REQ_)
-    if( 0 == strncmp(ifname, "dsl", 3) )
-    {
-        iWANInstance = 1;
-    }
-    else if( 0 == strncmp(ifname, "eth", 3) )
-    {
-        iWANInstance = 2;
-    }
-#endif
-    if (-1 == iWANInstance)
-    {
-      CcspTraceError(("%s %d Interface instance not present\n", __FUNCTION__, __LINE__));
-      return ANSC_STATUS_FAILURE;
-    }
-    //Set WAN LinkStatus
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, WAN_IF_LINK_STATUS, iWANInstance);
-    DmlEthSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName, LinkStatus, ccsp_string, TRUE);
-    CcspTraceInfo(("%s-%d:Successfully notified %s event to WAN Manager for %s interface \n", __FUNCTION__, __LINE__, LinkStatus, ifname));
-    return ANSC_STATUS_SUCCESS;
-}
-
-ANSC_STATUS EthLink_SendWanStatusForBaseManager(char *ifname, char *WanStatus)
-{
-    char acSetParamName[DATAMODEL_PARAM_LENGTH] = {0};
-    INT iEthInstance = -1;
-    INT iDSLInstance = -1;
-    INT iIsDSLInterface = 0;
-    INT iIsWANOEInterface = 0;
-    //Validate buffer
-    if ((NULL == ifname) || (NULL == WanStatus))
-    {
-        CcspTraceError(("%s Invalid Memory\n", __FUNCTION__));
+        CcspTraceError(("%s Path Or vlanStatus Null\n", __FUNCTION__));
         return ANSC_STATUS_FAILURE;
     }
 
-    if( 0 == strncmp(ifname, "dsl", 3) )
-    {
-       iIsDSLInterface = 1;
-    }
-    else if( 0 == strncmp(ifname, "eth", 3) )
-    {
-       iIsWANOEInterface = 1;
-    }
-    else if( 0 == strncmp(ifname, "veip", 4) )
-    {
-       iIsWANOEInterface = 1;
-    }
-    else
-    {
-        CcspTraceError(("%s Invalid WAN interface \n", __FUNCTION__));
-        return ANSC_STATUS_FAILURE;
-    }
-    if( iIsWANOEInterface )
-    {
-       EthLink_GetLowerLayersInstanceFromEthAgent(ifname, &iEthInstance);
-       if (-1 == iEthInstance)
-       {
-          CcspTraceError(("%s %d Failed to get Eth Instance(%d)\n", __FUNCTION__, __LINE__, iEthInstance));
-          return ANSC_STATUS_FAILURE;
-       }
-
-       CcspTraceInfo(("%s - %s:WANOE ETH Link Instance:%d\n", __FUNCTION__, ETH_MARKER_NOTIFY_WAN_BASE, iEthInstance));
-       //Set WAN Status
-       snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, ETH_STATUS_PARAM_NAME, iEthInstance);
-       DmlEthSetParamValues(ETH_COMPONENT_NAME, ETH_DBUS_PATH, acSetParamName, WanStatus, ccsp_string, TRUE);
-    }
-    else if( iIsDSLInterface )
-    {
-        /*TODO
-         * Need to be Reviewed. Hardcoded WAN Interface Instance for DSL.
-         */
-#if defined(_HUB4_PRODUCT_REQ_)
-       iDSLInstance = 1;
-#endif
-       if (-1 == iDSLInstance)
-       {
-          CcspTraceError(("%s %d Failed to get DSL Instance(%d)\n", __FUNCTION__, __LINE__, iDSLInstance));
-          return ANSC_STATUS_FAILURE;
-       }
-
-       CcspTraceInfo(("%s - %s:DSL Line Instance:%d\n", __FUNCTION__, ETH_MARKER_NOTIFY_WAN_BASE, iDSLInstance));
-       //Set WAN Status
-       snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, DSL_LINE_WAN_STATUS_PARAM_NAME, iDSLInstance);
-       DmlEthSetParamValues(DSL_COMPONENT_NAME, DSL_DBUS_PATH, acSetParamName, WanStatus, ccsp_string, TRUE);
-    }
-    CcspTraceInfo(("%s - %s:Successfully notified %s event to base WAN interface for %s interface \n", __FUNCTION__, ETH_MARKER_NOTIFY_WAN_BASE, WanStatus, ifname));
+    //Set WAN Virtual Iface VlanStatus
+    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, "%s.%s", path, "VlanStatus");
+    DmlEthSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName, vlanStatus, ccsp_string, TRUE);
+    CcspTraceInfo(("%s-%d:Successfully set the Virtual Interface(%s) VLAN Status(%s) \n", __FUNCTION__, __LINE__, path, vlanStatus));
     return ANSC_STATUS_SUCCESS;
 }
 
@@ -351,11 +266,13 @@ ANSC_STATUS EthLink_Enable(PDML_ETHERNET  pEntry)
         return ANSC_STATUS_FAILURE;
     }
 
-    //create makring table in ethlink here. no need to delete if ethlink is disabled.
+    //create marking table in ethlink here. no need to delete if ethlink is disabled.
+    /* TODO: Retry add making if DM gert fails. 
+     * Currently we continue to create VLAN link, if Marking get fails to avoid WAN failure.
+     */
     if (EthLink_AddMarking(pEntry) == ANSC_STATUS_FAILURE)
     {
-        CcspTraceError(("[%s-%d] Failed to Add Marking \n", __FUNCTION__, __LINE__));
-        return ANSC_STATUS_FAILURE;
+        CcspTraceError(("[%s-%d] Failed to Add Marking. Creating VLAN without Marking \n", __FUNCTION__, __LINE__));
     }
 
     if (pEntry->PriorityTagging == FALSE)
@@ -397,10 +314,7 @@ ANSC_STATUS EthLink_Enable(PDML_ETHERNET  pEntry)
 
             if (status == ETH_IF_UP)
             {
-                /*TODO:
-                 *Need to be Reviewed after Unification is finalised. 
-                 */
-                EthLink_SendWanStatusForBaseManager(pEntry->Alias, "Up");
+                EthLink_SendVirtualIfaceVlanStatus(pEntry->Path, "Up");
                 break;
             }
 
@@ -474,12 +388,9 @@ ANSC_STATUS EthLink_Disable(PDML_ETHERNET  pEntry)
         }
 #endif
         pEntry->Status = ETH_IF_DOWN;
-        /*TODO
-         * Need to be Reviewed after Unification is finalised.
-         */
-        //Notify WanStatus to WAN Manager and Base Manager.
-        EthLink_SendWanStatusForBaseManager(pEntry->Alias, "Down");
-        CcspTraceInfo(("[%s-%d] Successfully Updated WanStatus \n", __FUNCTION__, __LINE__));
+        //Notify Vlan Status to WAN Manager.
+        EthLink_SendVirtualIfaceVlanStatus(pEntry->Path, "Down");
+        CcspTraceInfo(("[%s-%d] Successfully Updated Vlan Status to WanManager \n", __FUNCTION__, __LINE__));
 
         CcspTraceInfo(("[%s-%d]  %s:Successfully deleted %s VLAN interface \n", __FUNCTION__, __LINE__, ETH_MARKER_VLAN_IF_DELETE, pEntry->Name)); 
     }
@@ -754,7 +665,7 @@ static ANSC_STATUS EthLink_DeleteMarking(PDML_ETHERNET pEntry)
     return ANSC_STATUS_SUCCESS;
 }
 
-ANSC_STATUS EthLink_AddMarking(PDML_ETHERNET pEntry)
+static ANSC_STATUS EthLink_AddMarking(PDML_ETHERNET pEntry)
 {
     char acGetParamName[256] = {0};
     char acSetParamName[256] = {0};
@@ -971,8 +882,36 @@ static ANSC_STATUS EthLink_CreateUnTaggedInterface(PDML_ETHERNET pEntry)
     return returnStatus;
 }
 
+/* Start Vlan Refresh Handle Thread */
+void* EthLink_RefreshHandleThread(void *Arg)
+{
+    PDML_ETHERNET pEntry = (PDML_ETHERNET)Arg;
+
+    if ( NULL == pEntry )
+    {
+        CcspTraceError(("%s-%d: Failed to Start Refresh Handle Thread, Arg pEntry Null \n", __FUNCTION__, __LINE__));
+        pthread_exit(NULL);
+    }
+
+    pthread_detach(pthread_self());
+
+    /* TODO: Retry add making if DM gert fails. 
+     * Currently we continue to create VLAN link, if Marking get fails to avoid WAN failure.
+     */
+    if (EthLink_AddMarking(pEntry) == ANSC_STATUS_FAILURE)
+    {
+        CcspTraceError(("[%s-%d] Failed to Update Refreshed Marking. Creating VLAN without Marking. \n", __FUNCTION__, __LINE__));
+    }
+    if (EthLink_TriggerVlanRefresh(pEntry) == ANSC_STATUS_FAILURE)
+    {
+        CcspTraceError(("[%s-%d] Failed to Trigger Vlan Refresh \n", __FUNCTION__, __LINE__));
+    }
+
+    pthread_exit(NULL);
+}
+
 /* Trigger VLAN Refresh */
-ANSC_STATUS EthLink_TriggerVlanRefresh(PDML_ETHERNET pEntry )
+static ANSC_STATUS EthLink_TriggerVlanRefresh(PDML_ETHERNET pEntry )
 {
     ANSC_STATUS returnStatus = ANSC_STATUS_SUCCESS;
     ethernet_link_status_e status = ETH_IF_DOWN;
@@ -997,10 +936,12 @@ ANSC_STATUS EthLink_TriggerVlanRefresh(PDML_ETHERNET pEntry )
         CcspTraceError(("%s Failed to Get VLANId and TPId for Interface(%s) \n", __FUNCTION__, pEntry->Alias));
     }
 
+    /* TODO: Retry add making if DM gert fails. 
+     * Currently we continue to create VLAN link, if Marking get fails to avoid WAN failure.
+     */
     if (EthLink_GetMarking(pEntry->Alias, &VlanCfg) == ANSC_STATUS_FAILURE)
     {
-        CcspTraceError(("%s Failed to Get Marking, so Can't Create Vlan Interface(%s) \n", __FUNCTION__, pEntry->Alias));
-        return ANSC_STATUS_FAILURE;
+        CcspTraceError(("%s Failed to Get Marking, Creating Vlan Interface(%s) without marking \n", __FUNCTION__, pEntry->Alias));
     }
 #if defined(VLAN_MANAGER_HAL_ENABLED)
     vlan_eth_hal_setMarkings(&VlanCfg);
@@ -1035,12 +976,9 @@ ANSC_STATUS EthLink_TriggerVlanRefresh(PDML_ETHERNET pEntry )
 
         if (status == ETH_IF_UP)
         {
-            /*TODO
-             * Need to be Reviewed after unificaton is finalized.
-             */
-            //Notify WanStatus to WAN Manager and Base Manager.
-            EthLink_SendLinkStatusForWanManager(pEntry->Alias, "Up");
-            CcspTraceInfo(("[%s-%d] Successfully Updated WanStatus \n", __FUNCTION__, __LINE__));
+            //Notify Vlan Status to WAN Manager.
+            EthLink_SendVirtualIfaceVlanStatus(pEntry->Path, "Up");
+            CcspTraceInfo(("[%s-%d] Successfully Updated Vlan Status to WanManager \n", __FUNCTION__, __LINE__));
             break;
         }
 
