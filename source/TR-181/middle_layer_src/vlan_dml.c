@@ -82,8 +82,6 @@
 
     *  Vlan_GetEntryCount
     *  Vlan_GetEntry
-    *  Vlan_AddEntry
-    *  Vlan_DelEntry
     *  Vlan_GetParamBoolValue
     *  Vlan_GetParamUlongValue
     *  Vlan_GetParamStringValue
@@ -127,7 +125,14 @@ Vlan_GetEntryCount
 {
     PDATAMODEL_VLAN             pVLAN         = (PDATAMODEL_VLAN)g_pBEManager->hVLAN;
 
-    return AnscSListQueryDepth( &pVLAN->Q_VlanList );
+    if (pVLAN)
+    {
+        return (pVLAN->ulVlantrInstanceNumber);
+    }
+    else
+    {
+        return 0;
+    }
 
 }
 
@@ -170,149 +175,18 @@ Vlan_GetEntry
         ULONG*                      pInsNumber
     )
 {
-    PDATAMODEL_VLAN             pMyObject         = (PDATAMODEL_VLAN)g_pBEManager->hVLAN;
-    PSINGLE_LINK_ENTRY          pSListEntry       = NULL;
-    PCONTEXT_LINK_OBJECT        pCxtLink          = NULL;
 
-    pSListEntry       = AnscSListGetEntryByIndex(&pMyObject->Q_VlanList, nIndex);
+    PDATAMODEL_VLAN             pVLAN       = (PDATAMODEL_VLAN)g_pBEManager->hVLAN;
+    PDML_VLAN          pVlanTrm = NULL;
 
-    if ( pSListEntry )
+    if ( pVLAN->VlanTer && nIndex < pVLAN->ulVlantrInstanceNumber )
     {
-        pCxtLink      = ACCESS_CONTEXT_LINK_OBJECT(pSListEntry);
-        *pInsNumber   = pCxtLink->InstanceNumber;
+        pVlanTrm = pVLAN->VlanTer+nIndex;
+        *pInsNumber = pVlanTrm->InstanceNumber;
+        return pVlanTrm;
     }
-
-    return (ANSC_HANDLE)pSListEntry;
-}
-
-/**********************************************************************
-
-    caller:     owner of this object
-
-    prototype:
-
-        ANSC_HANDLE
-        Vlan_AddEntry
-            (
-                ANSC_HANDLE                 hInsContext,
-                ULONG*                      pInsNumber
-            );
-
-    description:
-
-        This function is called to add a new entry.
-
-    argument:   ANSC_HANDLE                 hInsContext,
-                The instance handle;
-
-                ULONG*                      pInsNumber
-                The output instance number;
-
-    return:     The handle of new added entry.
-
-**********************************************************************/
-
-ANSC_HANDLE
-Vlan_AddEntry
-    (
-        ANSC_HANDLE                 hInsContext,
-        ULONG*                      pInsNumber
-    )
-{
-    ANSC_STATUS                          returnStatus      = ANSC_STATUS_SUCCESS;
-    PDATAMODEL_VLAN                      pVLAN             = (PDATAMODEL_VLAN)g_pBEManager->hVLAN;
-    PDML_VLAN                            p_Vlan            = NULL;
-    PCONTEXT_LINK_OBJECT                 pVlanCxtLink      = NULL;
-    PSINGLE_LINK_ENTRY                   pSListEntry       = NULL;
-    BOOL                                 bridgeMode;
-
-    p_Vlan = (PDML_VLAN)AnscAllocateMemory(sizeof(DML_VLAN));
-
-    if ( !p_Vlan )
-    {
-        return NULL;
-    }
-
-    pVlanCxtLink = (PCONTEXT_LINK_OBJECT)AnscAllocateMemory(sizeof(CONTEXT_LINK_OBJECT));
-    if ( !pVlanCxtLink )
-    {
-        goto EXIT;
-    }
-
-    /* now we have this link content */
-    pVlanCxtLink->hContext = (ANSC_HANDLE)p_Vlan;
-    pVlanCxtLink->bNew     = TRUE;
-
-    /* Get InstanceNumber and Alias */
-    VlanGenForTriggerEntry(NULL, p_Vlan);
-
-    pVlanCxtLink->InstanceNumber = p_Vlan->InstanceNumber ;
-    *pInsNumber                  = p_Vlan->InstanceNumber ;
-
-    SListPushEntryByInsNum(&pVLAN->Q_VlanList, (PCONTEXT_LINK_OBJECT)pVlanCxtLink);
-   
-    return (ANSC_HANDLE)pVlanCxtLink;
-
-EXIT:
-    AnscFreeMemory(p_Vlan);
 
     return NULL;
-}
-
-/**********************************************************************
-
-    caller:     owner of this object
-
-    prototype:
-
-        ULONG
-        Vlan_DelEntry
-            (
-                ANSC_HANDLE                 hInsContext,
-                ANSC_HANDLE                 hInstance
-            );
-
-    description:
-
-        This function is called to delete an exist entry.
-
-    argument:   ANSC_HANDLE                 hInsContext,
-                The instance handle;
-
-                ANSC_HANDLE                 hInstance
-                The exist entry handle;
-
-    return:     The status of the operation.
-
-**********************************************************************/
-
-ULONG
-Vlan_DelEntry
-    (
-        ANSC_HANDLE                 hInsContext,
-        ANSC_HANDLE                 hInstance
-    )
-{
-    ANSC_STATUS                returnStatus      = ANSC_STATUS_SUCCESS;
-    PDATAMODEL_VLAN            pVLAN             = (PDATAMODEL_VLAN)g_pBEManager->hVLAN;
-    PCONTEXT_LINK_OBJECT       pVlanCxtLink      = (PCONTEXT_LINK_OBJECT)hInstance;
-    PDML_VLAN                  p_Vlan            = (PDML_VLAN)pVlanCxtLink->hContext;
-
-
-    if ( pVlanCxtLink->bNew )
-    {
-        /* Set bNew to FALSE to indicate this node is not going to save to SysRegistry */
-        pVlanCxtLink->bNew    = FALSE;
-    }
-    if ( AnscSListPopEntryByLink(&pVLAN->Q_VlanList, &pVlanCxtLink->Linkage) )
-    {
-        AnscFreeMemory(pVlanCxtLink->hContext);
-        AnscFreeMemory(pVlanCxtLink);
-    }
-
-    pVLAN->ulPtNextInstanceNumber--;
-
-    return returnStatus;
 }
 
 /**********************************************************************
@@ -354,8 +228,7 @@ Vlan_GetParamBoolValue
         BOOL*                       pBool
     )
 {
-    PCONTEXT_LINK_OBJECT       pCxtLink      = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_VLAN                  p_Vlan        = (PDML_VLAN   )pCxtLink->hContext;
+    PDML_VLAN                  p_Vlan        = (PDML_VLAN   )hInsContext;
 
     /* check the parameter name and return the corresponding value */
     if( AnscEqualString(ParamName, "Enable", TRUE))
@@ -408,10 +281,14 @@ Vlan_GetParamIntValue
         int*                        pInt
     )
 {
-    PCONTEXT_LINK_OBJECT   pCxtLink  = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_VLAN              p_Vlan    = (PDML_VLAN   )pCxtLink->hContext;
+    PDML_VLAN              p_Vlan    = (PDML_VLAN   )hInsContext;
 
     /* check the parameter name and return the corresponding value */
+    if( AnscEqualString(ParamName, "VLANID", TRUE))
+    {
+        *pInt = p_Vlan->VLANId;
+        return TRUE;
+    }
 
     /* CcspTraceWarning(("Unsupported parameter '%s'\n", ParamName)); */
     return FALSE;
@@ -455,26 +332,27 @@ Vlan_GetParamUlongValue
         ULONG*                      puLong
     )
 {
-    PCONTEXT_LINK_OBJECT   pCxtLink  = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_VLAN              p_Vlan    = (PDML_VLAN   )pCxtLink->hContext;
+    PDML_VLAN              p_Vlan    = (PDML_VLAN   )hInsContext;
 
     /* check the parameter name and return the corresponding value */
+    if (p_Vlan == NULL)
+    {
+        CcspTraceError(("p_Vlan is Null, Parameter '%s'\n", ParamName));
+        return FALSE;
+    }
 
     if( AnscEqualString(ParamName, "Status", TRUE))
     {
-        if(ANSC_STATUS_SUCCESS == DmlGetVlanIfStatus(NULL, p_Vlan)) {
+        if(ANSC_STATUS_SUCCESS == Vlan_GetStatus(p_Vlan)) {
             *puLong = p_Vlan->Status;
         }
         return TRUE;
     }
     if( AnscEqualString(ParamName, "LastChange", TRUE))
     {
-        *puLong = p_Vlan->LastChange;
-        return TRUE;
-    }
-    if( AnscEqualString(ParamName, "VLANID", TRUE))
-    {
-        *puLong = p_Vlan->VLANId;
+        long cur_time = 0;
+        get_uptime(&cur_time);
+        *puLong = AnscGetTimeIntervalInSeconds(p_Vlan->LastChange, cur_time);
         return TRUE;
     }
     if( AnscEqualString(ParamName, "TPID", TRUE))
@@ -534,8 +412,7 @@ Vlan_GetParamStringValue
         ULONG*                      pUlSize
     )
 {
-    PCONTEXT_LINK_OBJECT  pCxtLink    = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_VLAN             p_Vlan      = (PDML_VLAN   )pCxtLink->hContext;
+    PDML_VLAN             p_Vlan      = (PDML_VLAN   )hInsContext;
     PUCHAR                pString       = NULL;
 
     /* check the parameter name and return the corresponding value */
@@ -611,14 +488,29 @@ Vlan_SetParamBoolValue
         BOOL                        bValue
     )
 {
-    PCONTEXT_LINK_OBJECT       pCxtLink  = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_VLAN                  p_Vlan    = (PDML_VLAN) pCxtLink->hContext;
 
+    PDML_VLAN                  p_Vlan    = (PDML_VLAN) hInsContext;
     /* check the parameter name and set the corresponding value */
     if( AnscEqualString(ParamName, "Enable", TRUE))
     {
-        /* save update to backup */
-        p_Vlan->Enable = bValue;
+        //Check whether enable param changed or not
+        if( bValue == p_Vlan->Enable )
+        {
+            return TRUE;
+        }
+
+	/* save update to backup */
+        p_Vlan->Enable  = bValue;
+
+        if(!p_Vlan->Enable)
+        {
+            Vlan_Disable(p_Vlan);
+        }
+        else
+        {
+            Vlan_Enable(p_Vlan);
+        }
+
         return TRUE;
     }
 
@@ -664,7 +556,13 @@ Vlan_SetParamIntValue
         int                         iValue
     )
 {
-    /* check the parameter name and set the corresponding value */
+    PDML_VLAN              p_Vlan    = (PDML_VLAN   )hInsContext;
+
+    if( AnscEqualString(ParamName, "VLANID", TRUE))
+    {
+        p_Vlan->VLANId = iValue;
+        return TRUE;
+    }
 
     /* CcspTraceWarning(("Unsupported parameter '%s'\n", ParamName)); */
     return FALSE;
@@ -709,18 +607,12 @@ Vlan_SetParamUlongValue
         ULONG                       uValue
     )
 {
-    PCONTEXT_LINK_OBJECT       pCxtLink   = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_VLAN                  p_Vlan     = (PDML_VLAN   )pCxtLink->hContext;
+    PDML_VLAN                  p_Vlan     = (PDML_VLAN   )hInsContext;
 
     /* check the parameter name and set the corresponding value */
     if( AnscEqualString(ParamName, "LastChange", TRUE))
     {
         p_Vlan->LastChange = uValue;
-        return TRUE;
-    }
-    if( AnscEqualString(ParamName, "VLANID", TRUE))
-    {
-        p_Vlan->VLANId = uValue;
         return TRUE;
     }
     if( AnscEqualString(ParamName, "TPID", TRUE))
@@ -773,9 +665,7 @@ Vlan_SetParamStringValue
     )
 {
     PDATAMODEL_VLAN            pVLAN          = (PDATAMODEL_VLAN      )g_pBEManager->hVLAN;
-    PCONTEXT_LINK_OBJECT       pCxtLink       = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_VLAN                  p_Vlan         = (PDML_VLAN   )pCxtLink->hContext;
-
+    PDML_VLAN                  p_Vlan         = (PDML_VLAN   )hInsContext;
 
     /* check the parameter name and set the corresponding value */
    
@@ -876,51 +766,6 @@ Vlan_Commit
     )
 {
     ANSC_STATUS                returnStatus  = ANSC_STATUS_SUCCESS;
-    PCONTEXT_LINK_OBJECT       pCxtLink      = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_VLAN                  p_Vlan        = (PDML_VLAN   )pCxtLink->hContext;
-    PDATAMODEL_VLAN            pVLAN         = (PDATAMODEL_VLAN      )g_pBEManager->hVLAN;
-
-    if ( pCxtLink->bNew )
-    {
-        if (p_Vlan->Enable)
-        {
-            returnStatus = DmlCreateVlanInterface(NULL, p_Vlan);
-            if ( returnStatus == ANSC_STATUS_SUCCESS )
-            {
-                pCxtLink->bNew = FALSE;
-            }
-            else
-            {
-                DML_VLAN_INIT(p_Vlan);
-                _ansc_sprintf(p_Vlan->Name, "vlan%d", p_Vlan->InstanceNumber);
-                if ( p_Vlan->Alias )
-                    AnscCopyString( p_Vlan->Alias, p_Vlan->Alias );
-            }
-        }
-    }
-    else 
-    {
-        if (p_Vlan->Enable)
-        {
-            returnStatus = DmlSetVlan(NULL, p_Vlan);
-            if ( returnStatus != ANSC_STATUS_SUCCESS)
-            {
-                if( ANSC_STATUS_SUCCESS != DmlGetVlan(NULL, p_Vlan->InstanceNumber, p_Vlan))
-                {
-                    DML_VLAN_INIT(p_Vlan);
-                    _ansc_sprintf(p_Vlan->Name, "vlan%d", p_Vlan->InstanceNumber);
-                }
-            }
-        }
-        else
-        {
-            returnStatus = DmlDeleteVlanInterface(NULL, p_Vlan);
-            if (returnStatus != ANSC_STATUS_SUCCESS)
-            {
-                CcspTraceError(("[%s][%d]Failed to delete vlan interface\n", __FUNCTION__, __LINE__));
-            }
-        }
-    }
 
     return returnStatus;
 }
@@ -957,21 +802,13 @@ Vlan_Rollback
 {
     ANSC_STATUS                returnStatus  = ANSC_STATUS_SUCCESS;
     PDATAMODEL_VLAN            pVLAN         = (PDATAMODEL_VLAN      )g_pBEManager->hVLAN;
-    PCONTEXT_LINK_OBJECT       pCxtLink      = (PCONTEXT_LINK_OBJECT)hInsContext;
-    PDML_VLAN                  p_Vlan        = (PDML_VLAN   )pCxtLink->hContext;
+    PDML_VLAN                  p_Vlan        = (PDML_VLAN   )hInsContext;
 
     if ( p_Vlan->Alias )
         AnscCopyString( p_Vlan->Alias, p_Vlan->Alias );
 
-    if ( !pCxtLink->bNew )
-    {
-        /* We have nothing to do with this case unless we have one getbyEntry() */
-    }
-    else
-    {
-        DML_VLAN_INIT(p_Vlan);
-        _ansc_sprintf(p_Vlan->Name, "vlan%d", p_Vlan->InstanceNumber);
-    }
+     DML_VLAN_INIT(p_Vlan);
+    _ansc_sprintf(p_Vlan->Name, "vlan%d", p_Vlan->InstanceNumber);
 
     return returnStatus;
 }

@@ -25,66 +25,16 @@
 <library/>
  <objects>
   <object>
-  <name>X_RDK_VlanManager</name>
-  <objectType>object</objectType>
-   <objects>
-    <object>
-     <name>Configuration</name>
-     <objectType>staticTable</objectType>
-     <maxInstance>8</maxInstance>
-     <functions>
-       <func_GetEntryCount>VlanCfg_GetEntryCount</func_GetEntryCount>
-       <func_GetEntry>VlanCfg_GetEntry</func_GetEntry>
-       <func_GetParamUlongValue>VlanCfg_GetParamUlongValue</func_GetParamUlongValue>
-       <func_SetParamUlongValue>VlanCfg_SetParamUlongValue</func_SetParamUlongValue>
-       <func_GetParamStringValue>VlanCfg_GetParamStringValue</func_GetParamStringValue>
-       <func_SetParamStringValue>VlanCfg_SetParamStringValue</func_SetParamStringValue>
-       <func_Validate>VlanCfg_Validate</func_Validate>
-       <func_Commit>VlanCfg_Commit</func_Commit>
-       <func_Rollback>VlanCfg_Rollback</func_Rollback>
-     </functions>
-     <parameters>
-      <parameter>
-       <name>Region</name>
-       <type>string(64)</type>
-       <syntax>string</syntax>
-       <writable>true</writable>
-      </parameter>
-      <parameter>
-       <name>VLANId</name>
-       <type>unsignedInt</type>
-       <syntax>uint32</syntax>
-       <writable>true</writable>
-      </parameter>
-      <parameter>
-       <name>TPId</name>
-       <type>unsignedInt</type>
-       <syntax>uint32</syntax>
-       <writable>true</writable>
-      </parameter>
-      <parameter>
-       <name>InterfaceType</name>
-       <type>string: DSL(1),WANOE(2),GPON(3)</type>
-       <syntax>uint32/mapped</syntax>
-       <writable>true</writable>
-      </parameter>
-     </parameters>
-    </object>
-   </objects>
-  </object>
-  <object>
   <name>X_RDK_Ethernet</name>
   <objectType>object</objectType>
    <objects>
     <object>
      <name>Link</name>
-     <objectType>writableTable</objectType>
+     <objectType>staticTable</objectType>
      <maxInstance>128</maxInstance>
      <functions>
       <func_GetEntryCount>EthLink_GetEntryCount</func_GetEntryCount>
       <func_GetEntry>EthLink_GetEntry</func_GetEntry>
-      <func_AddEntry>EthLink_AddEntry</func_AddEntry>
-      <func_DelEntry>EthLink_DelEntry</func_DelEntry>
       <func_GetParamBoolValue>EthLink_GetParamBoolValue</func_GetParamBoolValue>
       <func_GetParamUlongValue>EthLink_GetParamUlongValue</func_GetParamUlongValue>
       <func_GetParamStringValue>EthLink_GetParamStringValue</func_GetParamStringValue>
@@ -137,6 +87,11 @@
        <syntax>string</syntax>
       </parameter>
       <parameter>
+       <name>MACAddrOffSet</name>
+       <type>unsignedInt</type>
+       <syntax>uint32</syntax>
+      </parameter>
+      <parameter>
        <name>PriorityTagging</name>
        <type>boolean</type>
        <syntax>bool</syntax>
@@ -180,21 +135,19 @@
     </object>
     <object>
      <name>VLANTermination</name>
-     <objectType>writableTable</objectType>
+     <objectType>staticTable</objectType>
      <maxInstance>128</maxInstance>
      <functions>
       <func_GetEntryCount>Vlan_GetEntryCount</func_GetEntryCount>
       <func_GetEntry>Vlan_GetEntry</func_GetEntry>
-      <func_AddEntry>Vlan_AddEntry</func_AddEntry>
-      <func_DelEntry>Vlan_DelEntry</func_DelEntry>
       <func_GetParamBoolValue>Vlan_GetParamBoolValue</func_GetParamBoolValue>
-      <func_GetParamIntValue>Vlan_GetParamIntValue</func_GetParamIntValue>
-      <func_GetParamUlongValue>Vlan_GetParamUlongValue</func_GetParamUlongValue>
-      <func_GetParamStringValue>Vlan_GetParamStringValue</func_GetParamStringValue>
       <func_SetParamBoolValue>Vlan_SetParamBoolValue</func_SetParamBoolValue>
+      <func_GetParamIntValue>Vlan_GetParamIntValue</func_GetParamIntValue>
       <func_SetParamIntValue>Vlan_SetParamIntValue</func_SetParamIntValue>
+      <func_GetParamUlongValue>Vlan_GetParamUlongValue</func_GetParamUlongValue>
       <func_SetParamUlongValue>Vlan_SetParamUlongValue</func_SetParamUlongValue>
       <func_SetParamStringValue>Vlan_SetParamStringValue</func_SetParamStringValue>
+      <func_GetParamStringValue>Vlan_GetParamStringValue</func_GetParamStringValue>
       <func_Validate>Vlan_Validate</func_Validate>
       <func_Commit>Vlan_Commit</func_Commit>
       <func_Rollback>Vlan_Rollback</func_Rollback>
@@ -237,8 +190,8 @@
       </parameter>
       <parameter>
        <name>VLANID</name>
-       <type>unsignedInt</type>
-       <syntax>uint32</syntax>
+       <type>Int</type>
+       <syntax>int</syntax>
        <writable>true</writable>
       </parameter>
       <parameter>

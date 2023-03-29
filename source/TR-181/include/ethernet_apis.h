@@ -40,25 +40,35 @@
 #include "vlan_eth_hal.h"
 #include "platform_hal.h"
 
-#define ETHERNET_IF_STATUS_ERROR         7
 #define ETHERNET_IF_STATUS_NOT_PRESENT   5
-#ifdef _HUB4_PRODUCT_REQ_
-#define ETHERNET_VLAN_ID                 101
-#define ETHERNET_LINK_PATH               "Device.X_RDK_Ethernet.Link."
-#define DSL_IFC_STR                      "dsl"
 #define DEFAULT_VLAN_ID                  (-1)
-#else
-#define ETHERNET_LINK_PATH               "Device.X_RDK_Ethernet.Link."
-#define DEFAULT_VLAN_ID                  (-1)
-#endif
 
 /* * Telemetry Markers */
 #define ETH_MARKER_VLAN_IF_CREATE          "RDKB_VLAN_CREATE"
 #define ETH_MARKER_VLAN_IF_DELETE          "RDKB_VLAN_DELETE"
-#define ETH_MARKER_VLAN_TABLE_CREATE       "RDKB_VLAN_TABLE_CREATE"
-#define ETH_MARKER_VLAN_TABLE_DELETE       "RDKB_VLAN_TABLE_DELETE"
 #define ETH_MARKER_NOTIFY_WAN_BASE         "RDKB_WAN_NOTIFY"
 #define ETH_MARKER_VLAN_REFRESH            "RDKB_VLAN_REFRESH"
+
+extern ANSC_HANDLE bus_handle;
+
+#define CCSP_SUBSYS "eRT."
+#define PSM_VALUE_GET_VALUE(name, str) PSM_Get_Record_Value2(bus_handle, CCSP_SUBSYS, name, NULL, &(str))
+
+#define PSM_ENABLE_STRING_TRUE  "TRUE"
+#define PSM_ENABLE_STRING_FALSE  "FALSE"
+
+#define PSM_ETHLINK_COUNT        "dmsb.ethlink.ifcount"
+#define PSM_ETHLINK_ENABLE       "dmsb.ethlink.%d.Enable"
+#define PSM_ETHLINK_ALIAS        "dmsb.ethlink.%d.alias"
+#define PSM_ETHLINK_NAME         "dmsb.ethlink.%d.name"
+#define PSM_ETHLINK_LOWERLAYERS  "dmsb.ethlink.%d.lowerlayers"
+#define PSM_ETHLINK_MACOFFSET    "dmsb.ethlink.%d.macoffset"
+#define PSM_ETHLINK_BASEIFACE    "dmsb.ethlink.%d.baseiface"
+
+//PAM
+#define RDKB_PAM_COMPONENT_NAME           "eRT.com.cisco.spvtg.ccsp.pam"
+#define RDKB_PAM_DBUS_PATH                "/com/cisco/spvtg/ccsp/pam"
+#define PAM_BASE_MAC_ADDRESS              "Device.DeviceInfo.X_CISCO_COM_BaseMacAddress"
 
 /***********************************
     Actual definition declaration
@@ -76,18 +86,13 @@ typedef enum {
                ETH_IF_ERROR 
 }ethernet_link_status_e;
 
-typedef enum
-_VLAN_REFRESH_CALLER_ENUM
-{
-    VLAN_REFRESH_CALLED_FROM_VLANCREATION               = 1,
-    VLAN_REFRESH_CALLED_FROM_DML
-} VLAN_REFRESH_CALLER_ENUM;
-
 typedef  struct
 _COSA_DML_MARKING
 {
     ULONG      InstanceNumber;
+    CHAR       Alias[32];
     UINT       SKBPort;
+    INT        SKBMark;
     INT        EthernetPriorityMark;
 }
 COSA_DML_MARKING,  *PCOSA_DML_MARKING;
@@ -104,56 +109,22 @@ _DML_ETHERNET
     CHAR                 Path[128];
     UINT                 LastChange;
     CHAR                 LowerLayers[1024];
-    CHAR                 MACAddress[17];
+    CHAR                 MACAddress[18];
+    ULONG                MACAddrOffSet;
     BOOLEAN              PriorityTagging;
     UINT                 NumberofMarkingEntries;
     PCOSA_DML_MARKING    pstDataModelMarking;
 }
 DML_ETHERNET,  *PDML_ETHERNET;
 
-typedef  struct
-_VLAN_REFRESH_CFG
+static inline void DML_ETHERNET_INIT(PDML_ETHERNET pEth)
 {
-    CHAR                             WANIfName[64];
-    INT                              iWANInstance;
-    VLAN_REFRESH_CALLER_ENUM         enRefreshCaller;
-    vlan_configuration_t             stVlanCfg;
+    pEth->Enable                 = FALSE;
+    pEth->PriorityTagging        = FALSE;
+    pEth->Status                 = ETH_IF_DOWN;
+    pEth->NumberofMarkingEntries = 0;
+    pEth->pstDataModelMarking    = NULL;
 }
-VLAN_REFRESH_CFG,  *PVLAN_REFRESH_CFG;
-
-
-typedef  struct
-_VLAN_CREATION_CONFIG
-{
-    CHAR                    WANIfName[64];
-    DML_ETHERNET*           pEthEntry;
-}
-VLAN_CREATION_CONFIG;
-
-#define DML_ETHERNET_INIT(pEth)                   \
-{                                                 \
-    (pEth)->Enable                 = FALSE;       \
-    (pEth)->NumberofMarkingEntries = 0;           \
-    (pEth)->pstDataModelMarking    = NULL;        \
-}                                                 \
-
-/*
-Description:
-    This callback routine is provided for backend to call middle layer
-Arguments:
-    hDml          Opaque handle passed in from DmlEthInit.
-    pEntry        Pointer to ETHERNET vlan mapping to receive the generated values.
-Return:
-    Status of operation
-
-
-*/
-typedef ANSC_STATUS
-(*PFN_DML_ETHERNET_GEN)
-    (
-        ANSC_HANDLE                 hDml
-);
-
 
 /*************************************
     The actual function declaration
@@ -171,79 +142,35 @@ Status of operation.
 
 */
 ANSC_STATUS
-DmlEthInit
+EthLink_Init
     (
         ANSC_HANDLE                 hDml,
-        PANSC_HANDLE                phContext,
-        PFN_DML_ETHERNET_GEN        pValueGenFn
+        PANSC_HANDLE                phContext
     );
 /* APIs for ETHERNET */
 
-PDML_ETHERNET
-DmlGetEthCfgs
-    (
-        ANSC_HANDLE                 hContext,
-        PULONG                      pulCount,
-        BOOLEAN                     bCommit
-    );
-
 ANSC_STATUS
-DmlAddEth
+EthLink_GetStatus
     (
-        ANSC_HANDLE                 hContext,
-        PDML_ETHERNET               pEntry
-    );
-
-ANSC_STATUS
-DmlGetEthCfg
-    (
-        ANSC_HANDLE                 hContext,
-        ULONG                       InstanceNum,
         PDML_ETHERNET               p_Eth
     );
 
 ANSC_STATUS
-DmlGetEthCfgIfStatus
+EthLink_Enable
     (
-        ANSC_HANDLE                 hContext,
         PDML_ETHERNET               p_Eth
     );
 
 ANSC_STATUS
-DmlSetEthCfg
+EthLink_Disable
     (
-        ANSC_HANDLE                 hContext,
-        PDML_ETHERNET               p_Eth
-    );
-
-ANSC_STATUS
-DmlCreateEthInterface
-    (
-        ANSC_HANDLE                 hContext,
-        PDML_ETHERNET               p_Eth
-    );
-
-ANSC_STATUS
-DmlDeleteEthInterface
-    (
-        ANSC_HANDLE                 hContext,
         PDML_ETHERNET               p_Eth
     ); 
 
-ANSC_STATUS
-DmlEthSetWanStatusForBaseManager
-    (
-        char *ifname,
-        char *WanStatus
-    );
-
-ANSC_STATUS DmlEthSetVlanRefresh( char *ifname, VLAN_REFRESH_CALLER_ENUM  enRefreshCaller, vlan_configuration_t *pstVlanCfg );
-
-ANSC_STATUS VlanManager_SetVlanMarkings( char *ifname, vlan_configuration_t *pVlanCfg, BOOL vlan_creation);
-ANSC_STATUS DmlEthSendWanStatusForBaseManager(char *ifname, char *WanStatus);
-ANSC_STATUS DmlEthSendLinkStatusForWanManager(char *ifname, char *LinkStatus);
-
-ANSC_STATUS getInterfaceStatus(const char *iface, vlan_interface_status_e *status);
-ANSC_STATUS DmlGetHwAddressUsingIoctl( const char *pIfNameInput, char *pMACOutput, size_t t_MacLength );
-ANSC_STATUS GetVlanId(INT *pVlanId, PDML_ETHERNET pEntry);
+ANSC_STATUS EthLink_TriggerVlanRefresh( PDML_ETHERNET pEntry );
+ANSC_STATUS EthLink_GetMacAddr( PDML_ETHERNET pEntry );
+ANSC_STATUS EthLink_SendWanStatusForBaseManager(char *ifname, char *WanStatus);
+ANSC_STATUS EthLink_AddMarking(PDML_ETHERNET pEntry);
+ANSC_STATUS DmlEthGetParamValues(char *pComponent, char *pBus, char *pParamName, char *pReturnVal);
+ANSC_STATUS EthLink_GetMarking(char *ifname, vlan_configuration_t *pVlanCfg);
 #endif

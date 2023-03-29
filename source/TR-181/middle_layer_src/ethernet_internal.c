@@ -38,8 +38,9 @@
 #include "plugin_main_apis.h"
 #include "poam_irepfo_interface.h"
 #include "sys_definitions.h"
+#include "ccsp_psm_helper.h"
 
-extern void * g_pDslhDmlAgent;
+extern ANSC_HANDLE              bus_handle;
 
 /**********************************************************************
 
@@ -94,6 +95,125 @@ EthernetCreate
     return  (ANSC_HANDLE)pMyObject;
 }
 
+static ANSC_STATUS DmlEthGetPSMRecordValue ( char *pPSMEntry, char *pOutputString )
+{
+    int ret_val = ANSC_STATUS_SUCCESS;
+    int   retPsmGet = CCSP_SUCCESS;
+    char *strValue  = NULL;
+
+    //Validate buffer
+    if( ( NULL == pPSMEntry ) && ( NULL == pOutputString ) )
+    {
+        CcspTraceError(("%s %d Invalid buffer\n",__FUNCTION__,__LINE__));
+        return retPsmGet;
+    }
+
+    retPsmGet = PSM_VALUE_GET_VALUE(pPSMEntry, strValue);
+
+    if ( retPsmGet == CCSP_SUCCESS )
+    {
+        //Copy till end of the string
+        snprintf( pOutputString, strlen( strValue ) + 1, "%s", strValue );
+
+        ((CCSP_MESSAGE_BUS_INFO *)bus_handle)->freefunc(strValue);
+    }
+
+    return ret_val;
+}
+
+static ANSC_STATUS EthLink_Initialize( ANSC_HANDLE hThisObject)
+{
+    PDATAMODEL_ETHERNET pMyObject = (PDATAMODEL_ETHERNET)hThisObject;
+    PDML_ETHERNET pEthCfg = NULL;
+    char acPSMQuery[128]    = { 0 };
+    char acPSMValue[64]     = { 0 };
+    INT linkCount = 0;
+    INT nIndex = 0;
+    int ret ;
+
+    /* get link count */
+    snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_ETHLINK_COUNT );
+    ret = DmlEthGetPSMRecordValue( acPSMQuery, acPSMValue )   ;
+    if ( ret == 0)
+    {
+        linkCount = atoi (acPSMValue);
+    }
+
+    pMyObject->ulEthlinkInstanceNumber = linkCount ;
+
+    pEthCfg = (PDML_ETHERNET)AnscAllocateMemory(sizeof(DML_ETHERNET)* linkCount);
+    if (pEthCfg == NULL)
+    {
+        CcspTraceError(("%s-%d: Failed to Alloc Memory for EthLink \n", __FUNCTION__, __LINE__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    memset(pEthCfg, 0, sizeof(pEthCfg));
+
+    for(nIndex = 0; nIndex < linkCount; nIndex++)
+    {
+	 DML_ETHERNET_INIT(&pEthCfg[nIndex]);
+         pEthCfg[nIndex].InstanceNumber = nIndex + 1;
+
+         /* get enable value from psm */
+         snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_ETHLINK_ENABLE,nIndex + 1 );
+         ret = DmlEthGetPSMRecordValue( acPSMQuery, acPSMValue )   ;
+         if ( ret == 0)
+         {
+              if(strcmp (acPSMValue ,PSM_ENABLE_STRING_TRUE) == 0)
+              {
+                    pEthCfg[nIndex].Enable = TRUE ;
+              }
+              else
+              {
+                    pEthCfg[nIndex].Enable = FALSE;
+              }
+
+         }
+
+         /* get alias from psm */
+         snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_ETHLINK_ALIAS,nIndex + 1 );
+         ret = DmlEthGetPSMRecordValue( acPSMQuery, acPSMValue )   ;
+         if ( ret == 0)
+         {
+       	      strcpy(pEthCfg[nIndex].Alias, acPSMValue);
+         }
+
+         /* get name from psm */
+         snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_ETHLINK_NAME,nIndex + 1 );
+         ret = DmlEthGetPSMRecordValue( acPSMQuery, acPSMValue )   ;
+         if ( ret == 0)
+         {
+              strcpy(pEthCfg[nIndex].Name, acPSMValue);
+         }
+
+         /* get lowerlayers from psm */
+         snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_ETHLINK_LOWERLAYERS,nIndex + 1 );
+         ret = DmlEthGetPSMRecordValue( acPSMQuery, acPSMValue )   ;
+         if ( ret == 0)
+         {
+              strcpy(pEthCfg[nIndex].LowerLayers, acPSMValue);
+         }
+
+         /* get base interface from psm */
+         snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_ETHLINK_BASEIFACE,nIndex + 1 );
+         ret = DmlEthGetPSMRecordValue( acPSMQuery, acPSMValue )   ;
+         if ( ret == 0)
+         {
+              strcpy(pEthCfg[nIndex].BaseInterface, acPSMValue);
+         }
+
+         snprintf( acPSMQuery, sizeof( acPSMQuery ), PSM_ETHLINK_MACOFFSET,nIndex + 1 );
+         ret = DmlEthGetPSMRecordValue( acPSMQuery, acPSMValue )   ;
+         if ( ret == 0)
+         {
+             pEthCfg[nIndex].MACAddrOffSet = atoi(acPSMValue);
+         }
+    }
+    pMyObject->EthLink = pEthCfg;
+
+    return ANSC_STATUS_SUCCESS;
+}
 /**********************************************************************
 
     caller:     self
@@ -126,125 +246,21 @@ EthernetInitialize
 {
     ANSC_STATUS                     returnStatus     = ANSC_STATUS_SUCCESS;
     PDATAMODEL_ETHERNET             pMyObject        = (PDATAMODEL_ETHERNET)hThisObject;
-    PSLAP_VARIABLE                  pSlapVariable    = (PSLAP_VARIABLE             )NULL;
-    PPOAM_IREP_FOLDER_OBJECT        pPoamIrepFoCOSA  = NULL;
-    PPOAM_IREP_FOLDER_OBJECT        pPoamIrepFoEthernet   = NULL;
-    PPOAM_IREP_FOLDER_OBJECT        pPoamIrepFoEthernetPt = NULL;
 
     /* Call Initiation */
-    returnStatus = DmlEthInit(NULL, NULL, EthernetGen);
+    returnStatus = EthLink_Init(NULL, NULL);
     if ( returnStatus != ANSC_STATUS_SUCCESS )
     {
+        CcspTraceError(("%s-%d: Failed to Init SysEvent \n", __FUNCTION__, __LINE__));
         return returnStatus;
     }
 
-    /* Initiation all functions */
-    AnscSListInitializeHeader( &pMyObject->EthPMappingList );
-    AnscSListInitializeHeader( &pMyObject->Q_EthList );
-    pMyObject->MaxInstanceNumber        = 0;
-    pMyObject->ulPtNextInstanceNumber   = 1;
-    pMyObject->PreviousVisitTime        = 0;
-
-    /*Create ETHERNET folder in configuration */
-    pPoamIrepFoCOSA = (PPOAM_IREP_FOLDER_OBJECT)g_GetRegistryRootFolder(g_pDslhDmlAgent);
-
-    if ( !pPoamIrepFoCOSA )
+    returnStatus = EthLink_Initialize(pMyObject);
+    if ( returnStatus != ANSC_STATUS_SUCCESS )
     {
-        returnStatus = ANSC_STATUS_FAILURE;
-
-        goto  EXIT;
+        CcspTraceError(("%s-%d: Failed to Init EthLink \n", __FUNCTION__, __LINE__));
+        return returnStatus;
     }
-
-    pPoamIrepFoEthernet =
-        (PPOAM_IREP_FOLDER_OBJECT)pPoamIrepFoCOSA->GetFolder
-            (
-                (ANSC_HANDLE)pPoamIrepFoCOSA,
-                IREP_FOLDER_NAME_ETHERNET
-            );
-
-    if ( !pPoamIrepFoEthernet )
-    {
-        pPoamIrepFoCOSA->EnableFileSync((ANSC_HANDLE)pPoamIrepFoCOSA, FALSE);
-
-        pPoamIrepFoEthernet =
-            pPoamIrepFoCOSA->AddFolder
-                (
-                    (ANSC_HANDLE)pPoamIrepFoCOSA,
-                    IREP_FOLDER_NAME_ETHERNET,
-                    0
-                );
-
-        pPoamIrepFoCOSA->EnableFileSync((ANSC_HANDLE)pPoamIrepFoCOSA, TRUE);
-    }
-
-    if ( !pPoamIrepFoEthernet )
-    {
-        returnStatus = ANSC_STATUS_FAILURE;
-
-        goto  EXIT;
-    }
-    else
-    {
-        pMyObject->hIrepFolderEthernet = (ANSC_HANDLE)pPoamIrepFoEthernet;
-    }
-
-    pPoamIrepFoEthernetPt =
-        (PPOAM_IREP_FOLDER_OBJECT)pPoamIrepFoEthernet->GetFolder
-            (
-                (ANSC_HANDLE)pPoamIrepFoEthernet,
-                IREP_FOLDER_NAME_PORTTRIGGER
-            );
-
-    if ( !pPoamIrepFoEthernetPt )
-    {
-        /* pPoamIrepFoCOSA->EnableFileSync((ANSC_HANDLE)pPoamIrepFoCOSA, FALSE); */
-
-        pPoamIrepFoEthernetPt =
-            pPoamIrepFoCOSA->AddFolder
-                (
-                    (ANSC_HANDLE)pPoamIrepFoEthernet,
-                    IREP_FOLDER_NAME_PORTTRIGGER,
-                    0
-                );
-
-        /* pPoamIrepFoCOSA->EnableFileSync((ANSC_HANDLE)pPoamIrepFoCOSA, TRUE); */
-    }
-
-    if ( !pPoamIrepFoEthernetPt )
-    {
-        returnStatus = ANSC_STATUS_FAILURE;
-
-        goto  EXIT;
-    }
-    else
-    {
-        pMyObject->hIrepFolderEthernetPt = (ANSC_HANDLE)pPoamIrepFoEthernetPt;
-    }
-
-    /* Retrieve the next instance number for Port Trigger */
-
-    if ( TRUE )
-    {
-        if ( pPoamIrepFoEthernetPt )
-        {
-            pSlapVariable =
-                (PSLAP_VARIABLE)pPoamIrepFoEthernetPt->GetRecord
-                    (
-                        (ANSC_HANDLE)pPoamIrepFoEthernetPt,
-                        DML_RR_NAME_EthNextInsNumber,
-                        NULL
-                    );
-
-            if ( pSlapVariable )
-            {
-                pMyObject->ulPtNextInstanceNumber = pSlapVariable->Variant.varUint32;
-
-                SlapFreeVariable(pSlapVariable);
-            }
-        }
-    }
-
-EXIT:
 
     return returnStatus;
 }
@@ -281,41 +297,6 @@ EthernetRemove
 {
     ANSC_STATUS                     returnStatus = ANSC_STATUS_SUCCESS;
     PDATAMODEL_ETHERNET             pMyObject    = (PDATAMODEL_ETHERNET)hThisObject;
-    PSINGLE_LINK_ENTRY              pLink        = NULL;
-    PCONTEXT_LINK_OBJECT            pEthernet    = NULL;
-    PPOAM_IREP_FOLDER_OBJECT        pPoamIrepFo  = (PPOAM_IREP_FOLDER_OBJECT)pMyObject->hIrepFolderEthernet;
-    PPOAM_IREP_FOLDER_OBJECT        pPoamIrepPt  = (PPOAM_IREP_FOLDER_OBJECT)pMyObject->hIrepFolderEthernetPt;
-
-
-
-    /* Remove resource of writable entry link */
-    for( pLink = AnscSListPopEntry(&pMyObject->EthPMappingList); pLink; )
-    {
-        pEthernet = (PCONTEXT_LINK_OBJECT)ACCESS_CONTEXT_LINK_OBJECT(pLink);
-        pLink = AnscSListGetNextEntry(pLink);
-
-        AnscFreeMemory(pEthernet->hContext);
-        AnscFreeMemory(pEthernet);
-    }
-
-    for( pLink = AnscSListPopEntry(&pMyObject->Q_EthList); pLink; )
-    {
-        pEthernet = (PCONTEXT_LINK_OBJECT)ACCESS_CONTEXT_LINK_OBJECT(pLink);
-        pLink = AnscSListGetNextEntry(pLink);
-
-        AnscFreeMemory(pEthernet->hContext);
-        AnscFreeMemory(pEthernet);
-    }
-
-    if ( pPoamIrepPt )
-    {
-        pPoamIrepPt->Remove( (ANSC_HANDLE)pPoamIrepPt);
-    }
-
-    if ( pPoamIrepFo )
-    {
-        pPoamIrepFo->Remove( (ANSC_HANDLE)pPoamIrepFo);
-    }
 
     /* Remove self */
     AnscFreeMemory((ANSC_HANDLE)pMyObject);
@@ -323,77 +304,3 @@ EthernetRemove
     return returnStatus;
 }
 
-ANSC_STATUS
-EthernetGen
-    (
-        ANSC_HANDLE                 hDml
-    )
-{
-    ANSC_STATUS                     returnStatus      = ANSC_STATUS_SUCCESS;
-    PDATAMODEL_ETHERNET             pEthernet         = (PDATAMODEL_ETHERNET)g_pBEManager->hEth;
-
-    /*
-            For dynamic and writable table, we don't keep the Maximum InstanceNumber.
-            If there is delay_added entry, we just jump that InstanceNumber.
-        */
-    do
-    {
-        pEthernet->MaxInstanceNumber++;
-
-        if ( pEthernet->MaxInstanceNumber <= 0 )
-        {
-            pEthernet->MaxInstanceNumber   = 1;
-        }
-
-        if ( !SEthListGetEntryByInsNum(&pEthernet->EthPMappingList, pEthernet->MaxInstanceNumber) )
-        {
-            break;
-        }
-    }while(1);
-
-    //pEntry->InstanceNumber            = pEthernet->MaxInstanceNumber;
-
-    return returnStatus;
-}
-
-ANSC_STATUS
-EthGenForTriggerEntry
-    (
-        ANSC_HANDLE                 hDml,
-        PDML_ETHERNET               pEntry
-    )
-{
-    ANSC_STATUS                     returnStatus      = ANSC_STATUS_SUCCESS;
-    PDATAMODEL_ETHERNET             pEthernet         = (PDATAMODEL_ETHERNET)g_pBEManager->hEth;
-
-    /*
-            For dynamic and writable table, we don't keep the Maximum InstanceNumber.
-            If there is delay_added entry, we just jump that InstanceNumber.
-        */
-    do
-    {
-        if ( pEthernet->ulPtNextInstanceNumber == 0 )
-        {
-            pEthernet->ulPtNextInstanceNumber   = 1;
-        }
-
-        if ( !SEthListGetEntryByInsNum(&pEthernet->Q_EthList, pEthernet->ulPtNextInstanceNumber) )
-        {
-            break;
-        }
-        else
-        {
-            pEthernet->ulPtNextInstanceNumber++;
-        }
-    }while(1);
-
-    pEntry->InstanceNumber            = pEthernet->ulPtNextInstanceNumber;
-
-    snprintf( pEntry->Path, sizeof(pEntry->Path), "%s%d", ETHERNET_LINK_PATH, pEntry->InstanceNumber );
-    DML_ETHERNET_INIT(pEntry);
-    pEntry->Status = ETHERNET_IF_STATUS_NOT_PRESENT;
-
-    pEthernet->ulPtNextInstanceNumber++;
-
-    return returnStatus;
-}

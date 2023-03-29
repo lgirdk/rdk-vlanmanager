@@ -50,7 +50,6 @@
 #define  DATAMODEL_ETH_CLASS_CONTENT                                                   \
     /* duplication of the base object class content */                                      \
     COSA_BASE_CONTENT                                                                       \
-    /* start of VLAN object class content */                                                \
     SLIST_HEADER                    EthPMappingList;                                        \
     SLIST_HEADER                    Q_EthList;                                              \
     ULONG                           MaxInstanceNumber;                                      \
@@ -59,6 +58,8 @@
     UCHAR                           AliasOfPortMapping[64];                                 \
     ANSC_HANDLE                     hIrepFolderEthernet;                                    \
     ANSC_HANDLE                     hIrepFolderEthernetPt;                                  \
+    ULONG                           ulEthlinkInstanceNumber;                                \
+    PDML_ETHERNET                   EthLink;                                                \
 
 typedef  struct
 _DATAMODEL_ETHERNET
@@ -90,25 +91,6 @@ ANSC_STATUS
 EthernetRemove
     (
         ANSC_HANDLE                 hThisObject
-    );
-
-ANSC_STATUS
-EthernetGen
-    (
-        ANSC_HANDLE                 hDml
-    );
-
-ANSC_STATUS
-EthLinkRegGetInfo
-    (
-        ANSC_HANDLE                 hDml
-    );
-
-ANSC_STATUS
-EthLinkRegGetInfoForTriggerEntry
-    (
-        ANSC_HANDLE                 hDml,
-        PDML_ETHERNET               pEntry
     );
 
 #endif

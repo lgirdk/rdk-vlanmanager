@@ -38,12 +38,24 @@
 #include "vlan_mgr_apis.h"
 #include "ssp_global.h"
 
-#define VLAN_IF_STATUS_ERROR 7
-#define VLAN_IF_STATUS_NOT_PRESENT 5
-
 /* * Telemetry Markers */
 #define VLAN_MARKER_VLAN_IF_CREATE          "RDKB_VLAN_CREATE"
 #define VLAN_MARKER_VLAN_IF_DELETE          "RDKB_VLAN_DELETE"
+
+#define PSM_VLANMANAGER_COUNT             "dmsb.vlanmanager.ifcount"
+#define PSM_VLANMANAGER_ENABLE            "dmsb.vlanmanager.%d.VlanEnable"
+#define PSM_VLANMANAGER_ALIAS             "dmsb.vlanmanager.%d.alias"
+#define PSM_VLANMANAGER_NAME              "dmsb.vlanmanager.%d.name"
+#define PSM_VLANMANAGER_LOWERLAYERS       "dmsb.vlanmanager.%d.lowerlayers"
+#define PSM_VLANMANAGER_VLANID            "dmsb.vlanmanager.%d.vlanid"
+#define PSM_VLANMANAGER_TPID              "dmsb.vlanmanager.%d.tpid"
+#define PSM_VLANMANAGER_BASEINTERFACE     "dmsb.vlanmanager.%d.baseinterface"
+
+#define CCSP_SUBSYS "eRT."
+#define PSM_VALUE_GET_VALUE(name, str) PSM_Get_Record_Value2(bus_handle, CCSP_SUBSYS, name, NULL, &(str))
+
+#define PSM_ENABLE_STRING_TRUE  "TRUE"
+#define PSM_ENABLE_STRING_FALSE  "FALSE"
 
 /***********************************
     Actual definition declaration
@@ -51,13 +63,14 @@
 /*
     VLAN Part
 */
-typedef enum { Up = 1, 
-               Down, 
-               Unknown, 
-               Dormant, 
-               NotPresent, 
-               LowerLayerDown, 
-               Error 
+typedef enum { 
+    VLAN_IF_UP = 1,
+    VLAN_IF_DOWN,
+    VLAN_IF_UNKNOWN,
+    VLAN_IF_DORMANT,
+    VLAN_IF_NOTPRESENT,
+    VLAN_IF_LOWERLAYERDOWN,
+    VLAN_IF_ERROR
 }vlan_link_status_e;
 
 typedef  struct
@@ -71,50 +84,16 @@ _DML_VLAN
     UINT                 LastChange;
     CHAR                 LowerLayers[1024];
     CHAR                 BaseInterface[64];
-    UINT                 VLANId;
+    INT                 VLANId;
     UINT                 TPId;
 }
 DML_VLAN,  *PDML_VLAN;
 
-typedef enum { 
-    DSL = 1, 
-    WANOE, 
-    GPON
-}vlan_cfg_if_type_e;
-
-typedef  struct
-_DML_VLAN_CFG
+static inline void DML_VLAN_INIT(PDML_VLAN pVlan)
 {
-    ULONG                InstanceNumber;
-    CHAR                 Region[8];
-    vlan_cfg_if_type_e   InterfaceType;
-    UINT                 VLANId;
-    UINT                 TPId;
+    pVlan->Enable            = FALSE;
+    pVlan->Status            = VLAN_IF_DOWN;
 }
-DML_VLAN_CFG,  *PDML_VLAN_CFG;
-
-#define DML_VLAN_INIT(pVlan)                                            \
-{                                                                                  \
-    (pVlan)->Enable            = FALSE;                                      \
-}                                                                                  \
-
-/*
-Description:
-    This callback routine is provided for backend to call middle layer
-Arguments:
-    hDml          Opaque handle passed in from CosaDmlVlanInit.
-    pEntry        Pointer to VLAN vlan mapping to receive the generated values.
-Return:
-    Status of operation
-
-
-*/
-typedef ANSC_STATUS
-(*PFN_DML_VLAN_GEN)
-    (
-        ANSC_HANDLE                 hDml
-);
-
 
 /*************************************
     The actual function declaration
@@ -132,62 +111,26 @@ Status of operation.
 
 */
 ANSC_STATUS
-DmlVlanInit
-    (
-        ANSC_HANDLE                 hDml,
-        PANSC_HANDLE                phContext,
-        PFN_DML_VLAN_GEN            pValueGenFn
-    );
+Vlan_Init( void );
 /* APIs for VLAN */
 
-PDML_VLAN
-DmlGetVlans
-    (
-        ANSC_HANDLE                 hContext,
-        PULONG                      pulCount,
-        BOOLEAN                     bCommit
-    );
-
 ANSC_STATUS
-DmlAddVlan
+Vlan_GetStatus
     (
-        ANSC_HANDLE                 hContext,
-        PDML_VLAN                   pEntry
-    );
-
-ANSC_STATUS
-DmlGetVlan
-    (
-        ANSC_HANDLE                 hContext,
-        ULONG                       InstanceNum,
         PDML_VLAN                   p_Vlan
     );
 
 ANSC_STATUS
-DmlGetVlanIfStatus
+Vlan_Enable
     (
-        ANSC_HANDLE                 hContext,
         PDML_VLAN                   p_Vlan
     );
 
 ANSC_STATUS
-DmlSetVlan
+Vlan_Disable
     (
-        ANSC_HANDLE                 hContext,
         PDML_VLAN                   p_Vlan
     );
 
-ANSC_STATUS
-DmlCreateVlanInterface
-    (
-        ANSC_HANDLE                 hContext,
-        PDML_VLAN                   p_Vlan
-    );
-
-ANSC_STATUS
-DmlDeleteVlanInterface
-    (
-        ANSC_HANDLE                 hContext,
-        PDML_VLAN                   p_Vlan
-    );
+void get_uptime(long *uptime);
 #endif

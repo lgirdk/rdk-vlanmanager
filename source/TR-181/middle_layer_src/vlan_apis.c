@@ -35,11 +35,16 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/sysinfo.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
 #include "vlan_mgr_apis.h"
 #include "vlan_apis.h"
 #include "vlan_internal.h"
 #include "plugin_main_apis.h"
 #include "ethernet_apis.h"
+#include "ethernet_dml.h"
 #include "vlan_eth_hal.h"
 
 #ifdef FEATURE_MAPT
@@ -48,92 +53,87 @@
 #define IS_EMPTY_STRING(s)    ((s == NULL) || (*s == '\0'))
 #define SYSEVENT_WAN_IFACE_NAME "wan_ifname"
 #define BUFLEN_64 64
+
+#define PARAM_SIZE 10
+#define PARAM_SIZE_32 32
+#define PARAM_SIZE_64 64
+
 extern int sysevent_fd;
 extern token_t sysevent_token;
 #endif
 
+static ANSC_STATUS Vlan_CreateTaggedInterface(PDML_VLAN pEntry);
+static ANSC_STATUS Vlan_SetEthLink(PDML_VLAN pEntry, BOOL enable, BOOL PriTag);
+extern ANSC_STATUS EthLink_SendWanStatusForBaseManager(char *ifname, char *WanStatus);
+#if !defined(VLAN_MANAGER_HAL_ENABLED)
+static ANSC_STATUS Vlan_DeleteInterface(PDML_VLAN p_Vlan);
+static ANSC_STATUS Vlan_SetMacAddr(PDML_VLAN pEntry);
+#endif
 
-extern void* g_pDslhDmlAgent;
-extern ANSC_HANDLE                        g_MessageBusHandle;
-extern COSAGetSubsystemPrefixProc         g_GetSubsystemPrefix;
-extern char                 g_Subsystem[32];
-extern  ANSC_HANDLE                        bus_handle;
+/*****************************************************************/
+//VLAN APIs
 
-extern ANSC_STATUS DmlEthSetWanStatusForBaseManager(char *ifname, char *WanStatus);
-
-ANSC_STATUS
-SListPushEntryByInsNum
-    (
-        PSLIST_HEADER               pListHead,
-        PCONTEXT_LINK_OBJECT        pContext
-    )
+static ANSC_STATUS Vlan_GetTaggedVlanInterfaceStatus(const char *iface, vlan_link_status_e *status)
 {
-    ANSC_STATUS                     returnStatus      = ANSC_STATUS_SUCCESS;
-    PCONTEXT_LINK_OBJECT            pContextEntry     = (PCONTEXT_LINK_OBJECT)NULL;
-    PSINGLE_LINK_ENTRY              pSLinkEntry       = (PSINGLE_LINK_ENTRY       )NULL;
-    ULONG                           ulIndex           = 0;
+    int sfd;
+    int flag = FALSE;
+    struct ifreq intf;
 
-    if ( pListHead->Depth == 0 )
-    {
-        AnscSListPushEntryAtBack(pListHead, &pContext->Linkage);
+    if(iface == NULL) {
+       *status = VLAN_IF_NOTPRESENT;
+       return ANSC_STATUS_FAILURE;
     }
+
+    if ((sfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        *status = VLAN_IF_ERROR;
+        return ANSC_STATUS_FAILURE;
+    }
+
+    memset (&intf, 0, sizeof(struct ifreq));
+    strncpy(intf.ifr_name, iface, sizeof(intf.ifr_name) - 1);
+
+    if (ioctl(sfd, SIOCGIFFLAGS, &intf) == -1) {
+        *status = VLAN_IF_ERROR;
+    } else {
+        flag = (intf.ifr_flags & IFF_RUNNING) ? TRUE : FALSE;
+    }
+
+    if(flag == TRUE)
+        *status = VLAN_IF_UP;
     else
-    {
-        pSLinkEntry = AnscSListGetFirstEntry(pListHead);
+        *status = VLAN_IF_DOWN;
 
-        for ( ulIndex = 0; ulIndex < pListHead->Depth; ulIndex++ )
-        {
-            pContextEntry = ACCESS_CONTEXT_LINK_OBJECT(pSLinkEntry);
-            pSLinkEntry       = AnscSListGetNextEntry(pSLinkEntry);
-
-            if ( pContext->InstanceNumber < pContextEntry->InstanceNumber )
-            {
-                AnscSListPushEntryByIndex(pListHead, &pContext->Linkage, ulIndex);
-
-                return ANSC_STATUS_SUCCESS;
-            }
-        }
-
-        AnscSListPushEntryAtBack(pListHead, &pContext->Linkage);
-    }
+    close(sfd);
 
     return ANSC_STATUS_SUCCESS;
 }
 
-PCONTEXT_LINK_OBJECT
-SListGetEntryByInsNum
-    (
-        PSLIST_HEADER               pListHead,
-        ULONG                       InstanceNumber
-    )
+void get_uptime(long *uptime)
 {
-    ANSC_STATUS                     returnStatus      = ANSC_STATUS_SUCCESS;
-    PCONTEXT_LINK_OBJECT            pContextEntry     = (PCONTEXT_LINK_OBJECT)NULL;
-    PSINGLE_LINK_ENTRY              pSLinkEntry       = (PSINGLE_LINK_ENTRY       )NULL;
-    ULONG                           ulIndex           = 0;
-
-    if ( pListHead->Depth == 0 )
-    {
-        return NULL;
-    }
-    else
-    {
-        pSLinkEntry = AnscSListGetFirstEntry(pListHead);
-
-        for ( ulIndex = 0; ulIndex < pListHead->Depth; ulIndex++ )
-        {
-            pContextEntry = ACCESS_CONTEXT_LINK_OBJECT(pSLinkEntry);
-            pSLinkEntry   = AnscSListGetNextEntry(pSLinkEntry);
-
-            if ( pContextEntry->InstanceNumber == InstanceNumber )
-            {
-                return pContextEntry;
-            }
-        }
-    }
-
-    return NULL;
+    struct sysinfo info;
+    sysinfo( &info );
+    *uptime= info.uptime;
 }
+
+#if !defined(VLAN_MANAGER_HAL_ENABLED)
+static ANSC_STATUS Vlan_DeleteInterface(PDML_VLAN p_Vlan)
+{
+     char cmd[256] = {0};
+     char wan_interface[10] = {0};
+     char buff[10] =  {0};
+
+     if (NULL == p_Vlan)
+     {
+          CcspTraceError(("Error: Invalid arguement \n"));
+          return ANSC_STATUS_FAILURE;
+     }
+
+     snprintf(cmd, sizeof(cmd), "ip link delete %s", p_Vlan->Name);
+     v_secure_system(cmd);
+
+     return ANSC_STATUS_SUCCESS;
+}
+#endif
 
 /**********************************************************************
 
@@ -142,40 +142,27 @@ SListGetEntryByInsNum
     prototype:
 
         BOOL
-        DmlVlanInit
+        Vlan_Init
             (
-                ANSC_HANDLE                 hDml,
-                PANSC_HANDLE                phContext,
-                PFN_COSA_DML_VLAN_GEN        pValueGenFn
             );
 
         Description:
             This is the initialization routine for VLAN backend.
 
-        Arguments:
-            hDml               Opaque handle from DM adapter. Backend saves this handle for calling pValueGenFn.
-             phContext       Opaque handle passed back from backend, needed by CosaDmlVLANXyz() routines.
-            pValueGenFn    Function pointer to instance number/alias generation callback.
-
         Return:
             Status of operation.
 
 **********************************************************************/
-ANSC_STATUS
-DmlVlanInit
-    (
-        ANSC_HANDLE                 hDml,
-        PANSC_HANDLE                phContext,
-        PFN_DML_VLAN_GEN            pValueGenFn
-    )
+ANSC_STATUS Vlan_Init( void )
 {
     ANSC_STATUS  returnStatus = ANSC_STATUS_SUCCESS;
 
+#if defined(VLAN_MANAGER_HAL_ENABLED)
     returnStatus != vlan_eth_hal_init();
     if (returnStatus != ANSC_STATUS_SUCCESS) {
-        printf("vlan_eth_hal_init failed \n");
+        CcspTraceError(("%s-%d: vlan_eth_hal_init failed\n", __FUNCTION__, __LINE__));
     }
-
+#endif
     return returnStatus;
 }
 
@@ -185,61 +172,15 @@ DmlVlanInit
 
     prototype:
 
-        PDML_VLAN
-        DmlGetVlan
-            (
-                ANSC_HANDLE                 hContext,
-                PULONG                      instanceNum
-            )
-        Description:
-            This routine is to retrieve the VLAN instances.
-
-        Arguments:
-            InstanceNum.
-
-        Return:
-            The pointer to VLAN table, allocated by calloc. If no entry is found, NULL is returned.
-
-**********************************************************************/
-
-ANSC_STATUS
-DmlGetVlan
-    (
-        ANSC_HANDLE                 hContext,
-        ULONG                       InstanceNum,
-        PDML_VLAN                   p_Vlan
-    )
-{
-    BOOL                            bSetBack     = FALSE;
-    ULONG                           ulIndex      = 0;
-    int                             rc           = 0;
-    int                             count = 0;
-    if ( p_Vlan == NULL )
-    {
-        CcspTraceWarning(("DmlGetVlan pTrigger is NULL!\n"));
-        return ANSC_STATUS_FAILURE;
-    }
-
-    return ANSC_STATUS_SUCCESS;
-}
-
-/**********************************************************************
-
-    caller:     self
-
-    prototype:
-
         ANSC_STATUS
-        DmlGetVlanIfStatus
+        Vlan_GetStatus
             (
-                ANSC_HANDLE         hThisObject,
                 PCOSA_DML_VLAN      pEntry
             );
 
     Description:
         The API updated current state of a VLAN interface
     Arguments:
-        pAlias      The entry is identified through Alias.
         pEntry      The new configuration is passed through this argument, even Alias field can be changed.
 
     Return:
@@ -247,67 +188,101 @@ DmlGetVlan
 
 **********************************************************************/
 ANSC_STATUS
-DmlGetVlanIfStatus
+Vlan_GetStatus
     (
-        ANSC_HANDLE         hContext,
-        PDML_VLAN           pEntry          /* Identified by InstanceNumber */
+        PDML_VLAN           pEntry
     )
 {
-    ANSC_STATUS returnStatus = ANSC_STATUS_FAILURE;
-    vlan_interface_status_e status;
+    ANSC_STATUS returnStatus = ANSC_STATUS_SUCCESS;
+    vlan_link_status_e status;
 
     if ( pEntry != NULL )
     {
-        if (ANSC_STATUS_SUCCESS != getInterfaceStatus(pEntry->Name, &status))
+        if (pEntry->Enable)
         {
-            pEntry->Status = VLAN_IF_STATUS_ERROR;
-            CcspTraceError(("[%s][%d] %s: getInterfaceStatus failed \n", __FUNCTION__, __LINE__, pEntry->Name));
-        }
-        else
-        {
-            pEntry->Status = status;
-            returnStatus   = ANSC_STATUS_SUCCESS;
+            if (ANSC_STATUS_SUCCESS != Vlan_GetTaggedVlanInterfaceStatus(pEntry->Name, &status))
+            {
+                pEntry->Status = VLAN_IF_ERROR;
+                CcspTraceError(("%s-%d: Failed to Get Tagged Vlan Interface=%s Status \n", __FUNCTION__, __LINE__, pEntry->Name));
+            }
+            else
+            {
+                pEntry->Status = status;
+            }
         }
     }
     return returnStatus;
 }
 
-/**********************************************************************
-
-    caller:     self
-
-    prototype:
-
-        ANSC_STATUS
-        DmlCreateVlanInterface
-            (
-                ANSC_HANDLE         hThisObject,
-                PCOSA_DML_VLAN      pEntry
-            );
-
-    Description:
-        The API create the designated VLAN interface
-    Arguments:
-        pAlias      The entry is identified through Alias.
-        pEntry      The new configuration is passed through this argument, even Alias field can be changed.
-
-    Return:
-        Status of the operation
-
-**********************************************************************/
-
-ANSC_STATUS
-DmlCreateVlanInterface
-    (
-        ANSC_HANDLE         hContext,
-        PDML_VLAN           pEntry          /* Identified by InstanceNumber */
-    )
+static ANSC_STATUS Vlan_SetEthLink(PDML_VLAN pEntry, BOOL enable, BOOL PriTag)
 {
-    ANSC_STATUS  returnStatus  =  ANSC_STATUS_FAILURE;
-    if(pEntry->Enable) {
-        returnStatus = DmlSetVlan(hContext, pEntry);
+    INT iEthLinkInstance = -1;
+    INT EthLinkInstance = -1;
+    ANSC_HANDLE pNewEntry = NULL;
+
+
+    if (NULL == pEntry)
+    {
+        CcspTraceError(("%s Invalid buffer\n",__FUNCTION__));
+        return ANSC_STATUS_FAILURE;
     }
-    return returnStatus;
+
+    if (strlen(pEntry->LowerLayers) > 0)
+        sscanf( pEntry->LowerLayers, "Device.X_RDK_Ethernet.Link.%d", &iEthLinkInstance);
+
+    CcspTraceInfo(("%s-%d: iEthLinkInstance=%d \n",__FUNCTION__, __LINE__, iEthLinkInstance));
+    if (iEthLinkInstance > 0)
+    {
+        char acTableName[128] = {0};
+        pNewEntry = EthLink_GetEntry(NULL, (iEthLinkInstance - 1), &EthLinkInstance);
+        if (pNewEntry == NULL)
+        {
+           CcspTraceError(("%s Failed to add table \n", __FUNCTION__));
+           return ANSC_STATUS_FAILURE;
+        }
+    }
+    else
+    {
+        CcspTraceError(("%s Failed to get EthLink Instance \n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    //Set PriorityTagging.
+    if (enable == TRUE)
+    {
+        if (EthLink_SetParamBoolValue(pNewEntry, "PriorityTagging", PriTag) != TRUE)
+        {
+            CcspTraceError(("%s - Failed to set Enable data model\n", __FUNCTION__));
+            return ANSC_STATUS_FAILURE;
+        }
+    }
+
+    //Set Enable.
+    if (EthLink_SetParamBoolValue(pNewEntry, "Enable", enable) != TRUE)
+    {
+        CcspTraceError(("%s - Failed to set Enable data model\n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    //Set PriorityTagging.
+    if (enable == FALSE)
+    {
+        if (EthLink_SetParamBoolValue(pNewEntry, "PriorityTagging", PriTag) != TRUE)
+        {
+            CcspTraceError(("%s - Failed to set Enable data model\n", __FUNCTION__));
+            return ANSC_STATUS_FAILURE;
+        }
+    }
+
+    //Commit
+    if (EthLink_Commit(pNewEntry) != ANSC_STATUS_SUCCESS)
+    {
+        CcspTraceError(("%s - Failed to commit data model changes\n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+    CcspTraceInfo(("%s-%d:Successfully Set EthLink %s\n", __FUNCTION__, __LINE__, pEntry->Name));
+
+    return ANSC_STATUS_SUCCESS;
 }
 
 #ifdef FEATURE_MAPT
@@ -374,42 +349,21 @@ void mapt_ivi_check() {
     }
 }
 #endif
-/**********************************************************************
 
-    caller:     self
-
-    prototype:
-
-        ANSC_STATUS
-        DmlDeleteVlanInterface
-            (
-                ANSC_HANDLE         hThisObject,
-                PDML_ETHERNET      pEntry
-            );
-
-    Description:
-        The API delete the designated ETHERNET interface from the system
-    Arguments:
-        pAlias      The entry is identified through Alias.
-        pEntry      The new configuration is passed through this argument, even Alias field can be changed.
-
-    Return:
-        Status of the operation
-
-**********************************************************************/
-
-ANSC_STATUS
-DmlDeleteVlanInterface
-    (
-        ANSC_HANDLE         hContext,
-        PDML_VLAN           pEntry          /* Identified by InstanceNumber */
-    )
+ANSC_STATUS Vlan_Disable(PDML_VLAN pEntry)
 {
     ANSC_STATUS returnStatus = ANSC_STATUS_SUCCESS;
     int ret;
-    vlan_interface_status_e status;
+    vlan_link_status_e status;
 
-    if (!pEntry->Enable)
+    //Set EthLink to False. it will take care UnTagged Created Vlan Interface
+    if (Vlan_SetEthLink(pEntry, FALSE, FALSE) == ANSC_STATUS_FAILURE)
+    {
+        CcspTraceError(("%s-%d: Failed to Enable EthLink\n", __FUNCTION__, __LINE__));
+    }
+
+    //Delete Created Tagged Vlan Interface
+    if (pEntry->VLANId > 0)
     {
 #ifdef FEATURE_MAPT
         char wan_ifname[BUFLEN_64] = {0};
@@ -421,17 +375,13 @@ DmlDeleteVlanInterface
             }
         }
 #endif
-        /**
-         * 1. Check any vlan interface exists for this configuration in the CPE.
-         *    if so , delete it.
-         */
-        ret = getInterfaceStatus (pEntry->Name, &status);
+        ret = Vlan_GetTaggedVlanInterfaceStatus(pEntry->Name, &status);
         if (ret != ANSC_STATUS_SUCCESS)
         {
             CcspTraceError(("[%s][%d] %s: Failed to get vlan interface status \n", __FUNCTION__, __LINE__, pEntry->Name));
             return ANSC_STATUS_FAILURE;
         }
-
+#if defined(VLAN_MANAGER_HAL_ENABLED)
         if ( ( status != VLAN_IF_NOTPRESENT ) && ( status != VLAN_IF_ERROR ) )
         {
             returnStatus = vlan_eth_hal_deleteInterface(pEntry->Name, pEntry->InstanceNumber);
@@ -446,11 +396,105 @@ DmlDeleteVlanInterface
         {
             CcspTraceInfo(("%s - No VLAN interface found with this name %s\n", __FUNCTION__, pEntry->Name));
         }
+#else
+        Vlan_DeleteInterface(pEntry);
+#endif
     }
+    pEntry->Status = VLAN_IF_DOWN;
 
     return returnStatus;
 }
 
+#if !defined(VLAN_MANAGER_HAL_ENABLED)
+static ANSC_STATUS Vlan_GetEthLinkMacOffSet(PDML_VLAN pEntry, ULONG* pOffSet)
+{
+    INT iEthLinkInstance = -1;
+    INT EthLinkInstance = -1;
+    ANSC_HANDLE pNewEntry = NULL;
+
+
+    if (NULL == pEntry)
+    {
+        CcspTraceError(("%s Invalid buffer\n",__FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    if (strlen(pEntry->LowerLayers) > 0)
+        sscanf( pEntry->LowerLayers, "Device.X_RDK_Ethernet.Link.%d", &iEthLinkInstance);
+
+    CcspTraceInfo(("%s-%d: iEthLinkInstance=%d \n",__FUNCTION__, __LINE__, iEthLinkInstance));
+    if (iEthLinkInstance > 0)
+    {
+        char acTableName[128] = {0};
+        pNewEntry = EthLink_GetEntry(NULL, (iEthLinkInstance - 1), &EthLinkInstance);
+        if (pNewEntry == NULL)
+        {
+           CcspTraceError(("%s Failed to add table \n", __FUNCTION__));
+           return ANSC_STATUS_FAILURE;
+        }
+    }
+    else
+    {
+        CcspTraceError(("%s Failed to get EthLink Instance \n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    //Get MacOffSet.
+    if (EthLink_GetParamUlongValue(pNewEntry, "MACAddrOffSet", pOffSet) != TRUE)
+    {
+        CcspTraceError(("%s - Failed to set Enable data model\n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    return ANSC_STATUS_SUCCESS;
+}
+
+// Mac address schema Handling for VLAN interface.
+static ANSC_STATUS Vlan_SetMacAddr( PDML_VLAN pEntry )
+{
+    unsigned long long int number, new_mac;
+    char acTmpReturnValue[256] = {0};
+    char command[512] = {0};
+    char hex[32];
+    char macStr[32];
+    int i, j = 0;
+    int add = 0;
+
+    if(ANSC_STATUS_FAILURE == DmlEthGetParamValues(RDKB_PAM_COMPONENT_NAME, RDKB_PAM_DBUS_PATH, PAM_BASE_MAC_ADDRESS, acTmpReturnValue))
+    {
+        CcspTraceError(("[%s][%d]Failed to get param value\n", __FUNCTION__, __LINE__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    for(i = 0; acTmpReturnValue[i] != '\0'; i++)
+    {
+        if(acTmpReturnValue[i] != ':')
+        {
+            acTmpReturnValue[j++] = acTmpReturnValue[i];
+        }
+    }
+    acTmpReturnValue[j] = '\0';
+    sscanf(acTmpReturnValue, "%64llx", &number);
+
+    if (Vlan_GetEthLinkMacOffSet(pEntry, &add) == ANSC_STATUS_FAILURE)
+    {
+        CcspTraceError(("%s - Failed to set Enable data model\n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+    new_mac = number + add;
+
+    snprintf(hex, sizeof(hex), "%08llx", new_mac);
+    snprintf(macStr, sizeof(macStr), "%c%c:%c%c:%c%c:%c%c:%c%c:%c%c",
+    hex[0], hex[1], hex[2], hex[3], hex[4], hex[5], hex[6], hex[7], hex[8], hex[9], hex[10], hex[11]);
+
+    snprintf(command, sizeof(command), "ip link set dev %s.%d address %s\n",pEntry->Alias, pEntry->VLANId, macStr);
+    v_secure_system(command);
+    memset(command, 0, sizeof(command));
+
+    return ANSC_STATUS_SUCCESS;
+}
+
+#endif
 /**********************************************************************
 
     caller:     self
@@ -460,177 +504,163 @@ DmlDeleteVlanInterface
         ANSC_STATUS
         DmlSetVlan
             (
-                ANSC_HANDLE         hThisObject,
                 PDML_VLAN      pEntry
             );
 
     Description:
         The API re-configures the designated VLAN table entry.
     Arguments:
-        pAlias      The entry is identified through Alias.
         pEntry      The new configuration is passed through this argument, even Alias field can be changed.
 
     Return:
         Status of the operation
 
 **********************************************************************/
-
-ANSC_STATUS
-DmlSetVlan
-    (
-        ANSC_HANDLE         hContext,
-        PDML_VLAN           pEntry          /* Identified by InstanceNumber */
-    )
+#if defined(VLAN_MANAGER_HAL_ENABLED)
+static ANSC_STATUS Vlan_CreateTaggedInterface(PDML_VLAN pEntry)
 {
-    ANSC_STATUS             returnStatus  = ANSC_STATUS_SUCCESS;
-    vlan_configuration_t    vlan_conf;
+    ANSC_STATUS returnStatus = ANSC_STATUS_SUCCESS;
+    vlan_configuration_t VlanCfg;
 
-    memset (&vlan_conf, 0, sizeof(vlan_configuration_t));
-    strncpy(vlan_conf.BaseInterface, pEntry->BaseInterface, sizeof(vlan_conf.BaseInterface) - 1);
-    strncpy(vlan_conf.L3Interface, pEntry->Name, sizeof(vlan_conf.L3Interface) - 1);
-    strncpy(vlan_conf.L2Interface, pEntry->Alias, sizeof(vlan_conf.L2Interface) - 1);
-    vlan_conf.VLANId = pEntry->VLANId;
-    vlan_conf.TPId   = pEntry->TPId;
-    vlan_conf.IfaceInstanceNumber = pEntry->InstanceNumber;
-    vlan_interface_status_e status;
-    INT iIterator = 0;
+    if (pEntry == NULL)
+    {
+        CcspTraceError(("%s-%d: Failed to Create Tagged Vlan Interface\n", __FUNCTION__, __LINE__));
+        return ANSC_STATUS_FAILURE;
+    }
 
-    if (pEntry != NULL) {
-        if(pEntry->Enable) {
-            /**
-             * 1. Check vlan interface already exists.
-             *      a) If exists delete it and then create new one.
-             *      b) else directly create interface.
-             */
-            if (getInterfaceStatus(pEntry->Name, &status) != ANSC_STATUS_SUCCESS)
-            {
-                CcspTraceError(("[%s][%d]Failed to get vlan interface status \n", __FUNCTION__, __LINE__));
-                return ANSC_STATUS_FAILURE;
-            }
+    memset (&VlanCfg, 0, sizeof(vlan_configuration_t));
 
-            if ( ( status != VLAN_IF_NOTPRESENT ) && ( status != VLAN_IF_ERROR ) )
-            {
-                CcspTraceInfo(("%s %s:VLAN interface(%s) already exists, delete it first\n", __FUNCTION__, VLAN_MARKER_VLAN_IF_CREATE, vlan_conf.L3Interface));
-                returnStatus = vlan_eth_hal_deleteInterface(pEntry->Name, pEntry->InstanceNumber);
-                if (ANSC_STATUS_SUCCESS != returnStatus)
-                {
-                    CcspTraceError(("%s - Failed to delete the existing VLAN interface %s\n", __FUNCTION__, vlan_conf.L3Interface));
-                    return returnStatus;
-                }
+    strncpy(VlanCfg.BaseInterface, pEntry->BaseInterface, sizeof(VlanCfg.BaseInterface) - 1);
+    strncpy(VlanCfg.L3Interface, pEntry->Name, sizeof(VlanCfg.L3Interface) - 1);
+    strncpy(VlanCfg.L2Interface, pEntry->BaseInterface, sizeof(VlanCfg.L2Interface) - 1);
+    VlanCfg.VLANId = pEntry->VLANId;
+    VlanCfg.TPId   = pEntry->TPId;
 
-                CcspTraceInfo(("%s - %s:Successfully deleted VLAN interface %s\n", __FUNCTION__, VLAN_MARKER_VLAN_IF_DELETE, vlan_conf.L3Interface));
-            }
+    if (EthLink_GetMarking(pEntry->Alias, &VlanCfg) == ANSC_STATUS_FAILURE)
+    {
+        CcspTraceError(("%s Failed to Get Marking, so Can't Create Vlan Interface(%s) \n", __FUNCTION__, pEntry->Alias));
+        return ANSC_STATUS_FAILURE;
+    }
 
-            returnStatus = VlanManager_SetVlanMarkings(pEntry->Alias, &vlan_conf, TRUE);
-            if (ANSC_STATUS_SUCCESS != returnStatus)
-            {
-                pEntry->Status = VLAN_IF_STATUS_ERROR;
-                CcspTraceError(("[%s][%d]Failed to create VLAN interface \n", __FUNCTION__, __LINE__));
-                return returnStatus;
-            }
+    vlan_eth_hal_createInterface(&VlanCfg);
 
-            //Get status of VLAN link
-            while(iIterator < 10)
-            {
-                if (ANSC_STATUS_FAILURE == getInterfaceStatus(vlan_conf.L3Interface, &status))
-                {
-                    CcspTraceError(("[%s][%d] getInterfaceStatus failed for %s !! \n", __FUNCTION__, __LINE__, vlan_conf.L3Interface));
-                    return ANSC_STATUS_FAILURE;
-                }
-                if (status == VLAN_IF_UP)
-                {
-                    //Needs to inform base interface is UP after vlan creation
-                    DmlEthSendWanStatusForBaseManager(pEntry->BaseInterface, "Up");
-                    break;
-                }
-
-                iIterator++;
-                sleep(2);
-            }
-        }
+    //Free VlanCfg skb_config memory
+    if (VlanCfg.skb_config != NULL)
+    {
+        free(VlanCfg.skb_config);
+        VlanCfg.skb_config = NULL;
     }
 
     return returnStatus;
 }
-
-/**********************************************************************
-
-    caller:     self
-
-    prototype:
-
-        PCOSA_DML_VLAN
-        DmlGetVlans
-            (
-                ANSC_HANDLE                 hContext,
-                PULONG                      pulCount,
-                BOOLEAN                     bCommit
-            )
-        Description:
-            This routine is to retrieve vlan table.
-
-        Arguments:
-            pulCount  is to receive the actual number of entries.
-
-        Return:
-            The pointer to the array of VLAN table, allocated by calloc. If no entry is found, NULL is returned.
-
-**********************************************************************/
-
-PDML_VLAN
-DmlGetVlans
-    (
-        ANSC_HANDLE                 hContext,
-        PULONG                      pulCount,
-        BOOLEAN                     bCommit
-    )
+#else
+static ANSC_STATUS Vlan_CreateTaggedInterface(PDML_VLAN pEntry)
 {
-    if ( !pulCount )
+    ANSC_STATUS returnStatus = ANSC_STATUS_SUCCESS;
+    char cmd[256] = {0};
+
+    if (pEntry == NULL)
     {
-        CcspTraceWarning(("CosaDmlGetVlans pulCount is NULL!\n"));
-        return NULL;
-    }
-
-    *pulCount = 0;
-
-    return NULL;
-}
-
-/**********************************************************************
-
-    caller:     self
-
-    prototype:
-
-        ANSC_STATUS
-        DmlAddVlan
-            (
-                ANSC_HANDLE                 hContext,
-                PDML_VLAN      pEntry
-            )
-
-    Description:
-        The API adds one vlan entry into VLAN table.
-
-    Arguments:
-        pEntry      Caller does not need to fill in Status or Alias fields. Upon return, callee fills in the generated Alias and associated Status.
-
-    Return:
-        Status of the operation.
-
-**********************************************************************/
-
-ANSC_STATUS
-DmlAddVlan
-    (
-        ANSC_HANDLE                 hContext,
-        PDML_VLAN                   pEntry
-    )
-{
-    if (!pEntry)
-    {
+        CcspTraceError(("%s-%d: Failed to Create Tagged Vlan Interface\n", __FUNCTION__, __LINE__));
         return ANSC_STATUS_FAILURE;
     }
 
-    return ANSC_STATUS_SUCCESS;
+    snprintf(cmd, sizeof(cmd), "ip link add link %s name %s type vlan id %u", pEntry->Alias , pEntry->Name, pEntry->VLANId);
+    v_secure_system(cmd);
+
+    snprintf(cmd, sizeof(cmd), "ip link set %s up", pEntry->Name);
+    v_secure_system(cmd);
+
+    if (Vlan_SetMacAddr(pEntry) == ANSC_STATUS_FAILURE)
+    {
+        CcspTraceError(("%s Failed to Set MacAddress \n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    return returnStatus;
+}
+#endif
+
+ANSC_STATUS Vlan_Enable(PDML_VLAN pEntry)
+{
+    ANSC_STATUS returnStatus  = ANSC_STATUS_SUCCESS;
+    vlan_link_status_e status;
+    INT iIterator = 0;
+
+    if (pEntry == NULL)
+    {
+        CcspTraceError(("%s-%d: Failed to Enable Vlan\n", __FUNCTION__, __LINE__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    //Create Vlan Tagged Interface
+    if(pEntry->VLANId > 0) {
+        if (Vlan_SetEthLink(pEntry, TRUE, TRUE) == ANSC_STATUS_FAILURE)
+        {
+            CcspTraceError(("%s-%d: Failed to Enable EthLink\n", __FUNCTION__, __LINE__));
+        }
+
+        if (Vlan_GetTaggedVlanInterfaceStatus(pEntry->Name, &status) != ANSC_STATUS_SUCCESS)
+        {
+            CcspTraceError(("[%s][%d]Failed to get vlan interface status \n", __FUNCTION__, __LINE__));
+            return ANSC_STATUS_FAILURE;
+        }
+#if defined(VLAN_MANAGER_HAL_ENABLED)
+        if ( ( status != VLAN_IF_NOTPRESENT ) && ( status != VLAN_IF_ERROR ) )
+        {
+            CcspTraceInfo(("%s %s:VLAN interface(%s) already exists, delete it first\n", __FUNCTION__, VLAN_MARKER_VLAN_IF_CREATE, pEntry->Name));
+            returnStatus = vlan_eth_hal_deleteInterface(pEntry->Name, pEntry->InstanceNumber);
+            if (ANSC_STATUS_SUCCESS != returnStatus)
+            {
+                CcspTraceError(("%s - Failed to delete the existing VLAN interface %s\n", __FUNCTION__, pEntry->Name));
+                return returnStatus;
+            }
+            CcspTraceInfo(("%s - %s:Successfully deleted VLAN interface %s\n", __FUNCTION__, VLAN_MARKER_VLAN_IF_DELETE, pEntry->Name));
+        }
+#endif
+        returnStatus = Vlan_CreateTaggedInterface(pEntry);
+        if (ANSC_STATUS_SUCCESS != returnStatus)
+        {
+            pEntry->Status = VLAN_IF_ERROR;
+            CcspTraceError(("[%s][%d]Failed to create VLAN Tagged interface \n", __FUNCTION__, __LINE__));
+            return returnStatus;
+        }
+
+        //Get status of VLAN link
+        while(iIterator < 10)
+        {
+            if (ANSC_STATUS_FAILURE == Vlan_GetTaggedVlanInterfaceStatus(pEntry->Name, &status))
+            {
+                CcspTraceError(("%s-%d: Failed to get Tagged Vlan Interface=%s Status \n", __FUNCTION__, __LINE__, pEntry->Name));
+                return ANSC_STATUS_FAILURE;
+            }
+
+            if (VLAN_IF_UP == status)
+            {
+                /*TODO:
+		 * Need to be Reviewed after Unification is finalised.
+		 */
+                EthLink_SendWanStatusForBaseManager(pEntry->Alias, "Up");
+                CcspTraceInfo(("%s-%d: Successfully Updated WanStatus for Interface(%s) \n", __FUNCTION__, __LINE__, pEntry->Name));
+                break;
+            }
+
+            iIterator++;
+            sleep(2);
+        }
+        long uptime = 0;
+        get_uptime(&uptime);
+        pEntry->LastChange  =  uptime;
+    }
+    else
+    {
+        //Enable EthLink and it will take care Creation of UnTagged Vlan Interface.
+        if (Vlan_SetEthLink(pEntry, TRUE, FALSE) == ANSC_STATUS_FAILURE)
+        {
+            CcspTraceError(("%s-%d: Failed to Enable EthLink\n", __FUNCTION__, __LINE__));
+        }
+    }
+    pEntry->Status = VLAN_IF_UP;
+
+    return returnStatus;
 }

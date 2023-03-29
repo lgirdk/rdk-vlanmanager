@@ -43,8 +43,6 @@
 
     *  Vlan_GetEntryCount
     *  Vlan_GetEntry
-    *  Vlan_AddEntry
-    *  Vlan_DelEntry
     *  Vlan_GetParamBoolValue
     *  Vlan_GetParamUlongValue
     *  Vlan_GetParamStringValue
@@ -69,20 +67,6 @@ Vlan_GetEntry
         ANSC_HANDLE                 hInsContext,
         ULONG                       nIndex,
         ULONG*                      pInsNumber
-    );
-
-ANSC_HANDLE
-Vlan_AddEntry
-    (
-        ANSC_HANDLE                 hInsContext,
-        ULONG*                      pInsNumber
-    );
-
-ULONG
-Vlan_DelEntry
-    (
-        ANSC_HANDLE                 hInsContext,
-        ANSC_HANDLE                 hInstance
     );
 
 BOOL

@@ -43,8 +43,6 @@
 
     *  EthLink_GetEntryCount
     *  EthLink_GetEntry
-    *  EthLink_AddEntry
-    *  EthLink_DelEntry
     *  EthLink_GetParamBoolValue
     *  EthLink_GetParamUlongValue
     *  EthLink_GetParamStringValue
@@ -71,19 +69,6 @@ EthLink_GetEntry
         ULONG*                      pInsNumber
     );
 
-ANSC_HANDLE
-EthLink_AddEntry
-    (
-        ANSC_HANDLE                 hInsContext,
-        ULONG*                      pInsNumber
-    );
-
-ULONG
-EthLink_DelEntry
-    (
-        ANSC_HANDLE                 hInsContext,
-        ANSC_HANDLE                 hInstance
-    );
 
 BOOL
 EthLink_GetParamBoolValue

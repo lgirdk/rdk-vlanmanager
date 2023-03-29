@@ -196,11 +196,23 @@ BackEndManagerInitialize
      */
     // need to revisit this handling thread. causing SEGV.  RTian 5/31/2014
     // EvtDispterHandleEventAsync();
+    pMyObject->hVLAN = NULL;
 
-    pMyObject->hVLAN           = (ANSC_HANDLE)VlanCreate();
+    pMyObject->hVLAN = (ANSC_HANDLE)VlanCreate();
+    if (pMyObject->hVLAN == NULL)
+    {
+        AnscTraceWarning(("  VlanCreate Failed!\n"));
+        return ANSC_STATUS_FAILURE;
+    }
     AnscTraceWarning(("  VlanCreate done!\n"));
-   
-    pMyObject->hEth           = (ANSC_HANDLE)EthernetCreate();
+
+    pMyObject->hEth = NULL;
+    pMyObject->hEth = (ANSC_HANDLE)EthernetCreate();
+    if (pMyObject->hEth == NULL)
+    {
+        AnscTraceWarning(("  EthernetCreate Failed!\n"));
+        return ANSC_STATUS_FAILURE;
+    }
     AnscTraceWarning(("  EthernetCreate done!\n"));
 	
     return returnStatus;

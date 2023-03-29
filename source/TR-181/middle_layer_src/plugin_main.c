@@ -58,7 +58,6 @@
 #include "plugin_main.h"
 #include "plugin_main_apis.h"
 #include "vlan_dml.h"
-#include "vlan_cfg_dml.h"
 #include "ethernet_dml.h"
 
 PBACKEND_MANAGER_OBJECT g_pBEManager;
@@ -349,14 +348,12 @@ VlanManager_Init
     /* register the back-end apis for the data model */
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_GetEntryCount", Vlan_GetEntryCount );
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_GetEntry",  Vlan_GetEntry);
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_AddEntry",  Vlan_AddEntry);
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_DelEntry",  Vlan_DelEntry);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_GetParamBoolValue",  Vlan_GetParamBoolValue);
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_GetParamIntValue",  Vlan_GetParamIntValue);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_GetParamUlongValue",  Vlan_GetParamUlongValue);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_GetParamStringValue",  Vlan_GetParamStringValue);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_SetParamBoolValue",  Vlan_SetParamBoolValue);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_SetParamIntValue",  Vlan_SetParamIntValue);
+    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_GetParamIntValue",  Vlan_GetParamIntValue);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_SetParamUlongValue", Vlan_SetParamUlongValue );
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_SetParamStringValue",  Vlan_SetParamStringValue);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Vlan_Validate",  Vlan_Validate);
@@ -365,8 +362,6 @@ VlanManager_Init
 
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "EthLink_GetEntryCount", EthLink_GetEntryCount );
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "EthLink_GetEntry",  EthLink_GetEntry);
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "EthLink_AddEntry",  EthLink_AddEntry);
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "EthLink_DelEntry",  EthLink_DelEntry);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "EthLink_GetParamBoolValue",  EthLink_GetParamBoolValue);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "EthLink_GetParamUlongValue",  EthLink_GetParamUlongValue);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "EthLink_GetParamStringValue",  EthLink_GetParamStringValue);
@@ -383,16 +378,6 @@ VlanManager_Init
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Marking_Synchronize", Marking_Synchronize );
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Marking_GetParamIntValue", Marking_GetParamIntValue );
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Marking_GetParamUlongValue", Marking_GetParamUlongValue );
-
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "VlanCfg_GetEntryCount", VlanCfg_GetEntryCount );
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "VlanCfg_GetEntry", VlanCfg_GetEntry);
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "VlanCfg_GetParamUlongValue", VlanCfg_GetParamUlongValue  );
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "VlanCfg_SetParamUlongValue", VlanCfg_SetParamUlongValue );
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "VlanCfg_GetParamStringValue", VlanCfg_GetParamStringValue );
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "VlanCfg_SetParamStringValue", VlanCfg_SetParamStringValue );
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "VlanCfg_Validate", VlanCfg_Validate );
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "VlanCfg_Commit", VlanCfg_Commit  );
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "VlanCfg_Rollback", VlanCfg_Rollback );
 
     /* Create backend framework */
     g_pBEManager = (PBACKEND_MANAGER_OBJECT)BackEndManagerCreate();

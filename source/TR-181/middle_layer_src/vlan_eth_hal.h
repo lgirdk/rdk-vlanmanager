@@ -100,30 +100,15 @@
 #define VLAN_ETH_TERMINATION_NAME "Device.Ethernet.VLANTermination.%d.Name"
 #define VLAN_ETH_TERMINATION_VLANID "Device.Ethernet.VLANTermination.%d.VLANID"
 #define VLAN_ETH_TERMINATION_TPID "Device.Ethernet.VLANTermination.%d.TPID"
-#ifdef _HUB4_PRODUCT_REQ_
+#if defined(VLAN_MANAGER_HAL_ENABLED)
 #define WANIF_ETH_MARKING_SKBPORT "Device.Ethernet.Link.%d.X_RDK_Marking.%d.SKBPort"
 #define WANIF_ETH_MARKING_PRIORITYMARK "Device.Ethernet.Link.%d.X_RDK_Marking.%d.EthernetPriorityMark"
 #endif
 
 /**********************************************************************
-                ENUMERATION DEFINITIONS
-**********************************************************************/
-// Enumerator for VLAN interface status
-typedef enum {
-     VLAN_IF_UP = 1,
-     VLAN_IF_DOWN,
-     VLAN_IF_UNKNOWN,
-     VLAN_IF_DORMANT,
-     VLAN_IF_NOTPRESENT,
-     VLAN_IF_LOWERLAYERDOWN,
-     VLAN_IF_ERROR
-}vlan_interface_status_e;
-
-/**********************************************************************
                 STRUCTURE DEFINITIONS
 **********************************************************************/
 
-#ifdef _HUB4_PRODUCT_REQ_
 typedef struct _VLAN_SKB_CONFIG
 {
      char alias[32]; /* Indicates DATA or VOICE */
@@ -131,7 +116,6 @@ typedef struct _VLAN_SKB_CONFIG
      unsigned int skbPort; /* SKB Marking Port */
      unsigned int skbEthPriorityMark; /* SKB Ethernet Priority. */
 }vlan_skb_config_t;
-#endif //_HUB4_PRODUCT_REQ_
 
 // Structure for VLAN configuration
 typedef struct _vlan_configuration
@@ -142,10 +126,8 @@ typedef struct _vlan_configuration
      char L3Interface[64]; /* L3 interface like erouter0. */
      int VLANId; /* Vlan Id */
      unsigned int TPId; /* Vlan tag protocol identifier. */
-#ifdef _HUB4_PRODUCT_REQ_
      unsigned int skbMarkingNumOfEntries; /* Number of SKB marking entries. */
      vlan_skb_config_t *skb_config; /* SKB Marking Data. */
-#endif //_HUB4_PRODUCT_REQ_
 } vlan_configuration_t;
 
 /**********************************************************************
@@ -154,6 +136,7 @@ typedef struct _vlan_configuration
  *
 ***********************************************************************/
 
+#if defined(VLAN_MANAGER_HAL_ENABLED)
 /**
 * @description This HAL is used to initialize the vlan hal client. Connected to rpc
 * server to send/receive data.
@@ -187,7 +170,6 @@ int vlan_eth_hal_init();
 */
 int vlan_eth_hal_createInterface(vlan_configuration_t *config);
 
-#ifdef _HUB4_PRODUCT_REQ_
 /**
 * @description This HAL API is used to configure the vlan interface incase if any update in SKB marking configuration.
 
@@ -201,7 +183,6 @@ int vlan_eth_hal_createInterface(vlan_configuration_t *config);
 *
 */
 int vlan_eth_hal_setMarkings(vlan_configuration_t *config);
-#endif // _HUB4_PRODUCT_REQ_
 
 /**
 * @description This HAL is used to deassociate an existing vlan interface
@@ -217,4 +198,5 @@ int vlan_eth_hal_setMarkings(vlan_configuration_t *config);
 */
 int vlan_eth_hal_deleteInterface(char *ifname, int instanceNumber);
 
+#endif // VLAN_MANAGER_HAL_ENABLED
 #endif /*__VLAN_ETH_HAL_H__*/

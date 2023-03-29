@@ -74,13 +74,11 @@ typedef  ANSC_HANDLE
     (
         VOID
     );
-
 typedef  ANSC_STATUS
 (*PFN_DM_REMOVE)
     (
         ANSC_HANDLE                 hThisObject
     );
-
 typedef  ANSC_STATUS
 (*PFN_DM_INITIALIZE)
     (
@@ -90,11 +88,10 @@ typedef  ANSC_STATUS
 /*
  * the main struct in cosa_xxx_apis.h need includes this struct and realize all functions. 
  */
-#define  COSA_BASE_CONTENT                                                                  \
-    /* start of object class content */                                                     \
-    ULONG                           Oid;                                                    \
-    ANSC_HANDLE                     hSbContext;                                             \
-                                                                                            \
+#define  COSA_BASE_CONTENT                                                              \
+    /* start of object class content */                                                 \
+    ULONG                           Oid;                                                \
+    ANSC_HANDLE                     hSbContext;                                         \
     PFN_DM_CREATE               Create;                                                 \
     PFN_DM_REMOVE               Remove;                                                 \
     PFN_DM_INITIALIZE           Initialize;                                             \
@@ -137,41 +134,5 @@ CONTEXT_LINK_OBJECT,  *PCONTEXT_LINK_OBJECT;
     (cxt)->hPoamIrepFo         = (ANSC_HANDLE)NULL;                                    \
 
 #define  DML_ALIAS_NAME_LENGTH                 64
-
-
-ANSC_STATUS
-SListPushEntryByInsNum
-    (
-        PSLIST_HEADER          pListHead,
-        PCONTEXT_LINK_OBJECT   pCosaContext
-    );
-
-ANSC_STATUS
-SEthListPushEntryByInsNum
-    (
-        PSLIST_HEADER          pListHead,
-        PCONTEXT_LINK_OBJECT   pCosaContext
-    );
-
-PCONTEXT_LINK_OBJECT
-SListGetEntryByInsNum
-    (
-        PSLIST_HEADER               pListHead,
-        ULONG                       InstanceNumber
-    );
-
-ANSC_STATUS
-SEthListPushEntryByInsNum
-    (
-        PSLIST_HEADER          pListHead,
-        PCONTEXT_LINK_OBJECT   pCosaContext
-    );
-
-PCONTEXT_LINK_OBJECT
-SEthListGetEntryByInsNum
-    (
-        PSLIST_HEADER               pListHead,
-        ULONG                       InstanceNumber
-    );
 
 #endif
