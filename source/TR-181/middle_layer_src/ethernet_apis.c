@@ -931,7 +931,7 @@ static ANSC_STATUS DmlEthGetParamNames(
     int *pReturnSize)
 {
     CCSP_MESSAGE_BUS_INFO *bus_info = (CCSP_MESSAGE_BUS_INFO *)bus_handle;
-    parameterInfoStruct_t **retInfo;
+    parameterInfoStruct_t **retInfo = NULL;
     char *ParamName[1];
     int ret = 0,
         nval;
