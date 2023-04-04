@@ -79,6 +79,15 @@
 //WAN Agent
 #define WAN_DBUS_PATH                     "/com/cisco/spvtg/ccsp/wanmanager"
 #define WAN_COMPONENT_NAME                "eRT.com.cisco.spvtg.ccsp.wanmanager"
+#if defined(WAN_MANAGER_UNIFICATION_ENABLED)
+#define WAN_NOE_PARAM_NAME                "Device.X_RDK_WanManager.InterfaceNumberOfEntries"
+#define WAN_IF_VLAN_NAME_PARAM            "Device.X_RDK_WanManager.Interface.%d.VirtualInterface.1.Name"
+#define WAN_IF_NAME_PARAM_NAME            "Device.X_RDK_WanManager.Interface.%d.Name"
+#define WAN_IF_STATUS_PARAM_NAME          "Device.X_RDK_WanManager.Interface.%d.VirtualInterface.1.Status"
+#define WAN_IF_LINK_STATUS                "Device.X_RDK_WanManager.Interface.%d.VirtualInterface.1.VlanStatus"
+#define WAN_MARKING_NOE_PARAM_NAME        "Device.X_RDK_WanManager.Interface.%d.MarkingNumberOfEntries"
+#define WAN_MARKING_TABLE_NAME            "Device.X_RDK_WanManager.Interface.%d.Marking."
+#else
 #define WAN_NOE_PARAM_NAME                "Device.X_RDK_WanManager.CPEInterfaceNumberOfEntries"
 #define WAN_IF_VLAN_NAME_PARAM            "Device.X_RDK_WanManager.CPEInterface.%d.Wan.Name"
 #define WAN_IF_NAME_PARAM_NAME            "Device.X_RDK_WanManager.CPEInterface.%d.Name"
@@ -87,6 +96,7 @@
 
 #define WAN_MARKING_NOE_PARAM_NAME        "Device.X_RDK_WanManager.CPEInterface.%d.MarkingNumberOfEntries"
 #define WAN_MARKING_TABLE_NAME            "Device.X_RDK_WanManager.CPEInterface.%d.Marking."
+#endif /* WAN_MANAGER_UNIFICATION_ENABLED */
 
 extern void* g_pDslhDmlAgent;
 extern ANSC_HANDLE                        g_MessageBusHandle;
