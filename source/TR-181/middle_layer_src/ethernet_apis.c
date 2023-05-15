@@ -48,6 +48,12 @@
 #include "vlan_internal.h"
 #include "vlan_dml.h"
 #include "vlan_eth_hal.h"
+#if defined(COMCAST_VLAN_HAL_ENABLED)
+#include "ccsp_hal_ethsw.h"
+#include "secure_wrapper.h"
+#include "ccsp_psm_helper.h"
+#include <platform_hal.h>
+#endif //COMCAST_VLAN_HAL_ENABLED
 
 /* **************************************************************************************************** */
 #define DATAMODEL_PARAM_LENGTH 256
@@ -111,6 +117,14 @@ static ANSC_STATUS EthLink_TriggerVlanRefresh(PDML_ETHERNET pEntry );
 static ANSC_STATUS EthLink_SetEgressQoSMap( vlan_configuration_t *pVlanCfg );
 #endif
 
+#if defined(COMCAST_VLAN_HAL_ENABLED)
+static ANSC_STATUS EthLink_CreateBridgeInterface(BOOL isAutoWanMode);
+static INT EthLink_Hal_BridgeConfigIntelPuma7(WAN_MODE_BRIDGECFG *pCfg);
+static INT EthLink_Hal_BridgeConfigBcm(WAN_MODE_BRIDGECFG *pCfg);
+static BOOL EthLink_IsWanEnabled();
+static void EthLink_GetInterfaceMacAddress(macaddr_t* macAddr,char *pIfname);
+static INT EthLink_BridgeNfDisable( const char* bridgeName, bridge_nf_table_t table, BOOL disable );
+#endif
 /* *************************************************************************************************** */
 
 /* * EthLink_SyseventInit() */
@@ -856,10 +870,11 @@ static ANSC_STATUS EthLink_CreateUnTaggedInterface(PDML_ETHERNET pEntry)
     }
 #if defined(VLAN_MANAGER_HAL_ENABLED)
     vlan_eth_hal_createInterface(&VlanCfg);
-#else
+#elif defined(COMCAST_VLAN_HAL_ENABLED)
 /*TODO
  * Need to Add Code for HAL Independent Untagged Vlan/Bridge Interface creation.
  */
+    EthLink_CreateBridgeInterface(TRUE);
 #endif
     //Free VlanCfg skb_config memory
     if (VlanCfg.skb_config != NULL)
@@ -1045,7 +1060,6 @@ static ANSC_STATUS EthLink_SetEgressQoSMap( vlan_configuration_t *pVlanCfg )
 {
     INT SKBMark = 0;
     INT EthPriority = 0;
-    char command[512] = {0};
 
     if ((pVlanCfg == NULL) || (pVlanCfg->skb_config == NULL))
     {
@@ -1058,12 +1072,9 @@ static ANSC_STATUS EthLink_SetEgressQoSMap( vlan_configuration_t *pVlanCfg )
     {
         for(int i = 0; i < pVlanCfg->skbMarkingNumOfEntries; i++)
         {
-            memset(command, 0, sizeof(command));
-
             SKBMark = pVlanCfg->skb_config[i].skbMark;
             EthPriority = pVlanCfg->skb_config[i].skbEthPriorityMark;
-            snprintf(command, sizeof(command), "ip link set %s.%d type vlan egress-qos-map %d:%d", pVlanCfg->L3Interface, pVlanCfg->VLANId, SKBMark, EthPriority);
-            v_secure_system(command);
+            v_secure_system("ip link set %s.%d type vlan egress-qos-map %d:%d", pVlanCfg->L3Interface, pVlanCfg->VLANId, SKBMark, EthPriority);
         }
     }
 
@@ -1211,3 +1222,504 @@ ANSC_STATUS EthLink_GetMacAddr( PDML_ETHERNET pEntry )
     return ANSC_STATUS_SUCCESS;
         }
 
+#if defined(COMCAST_VLAN_HAL_ENABLED)
+static ANSC_STATUS EthLink_CreateBridgeInterface(BOOL isAutoWanMode)
+{
+    char wanPhyName[64] = {0};
+    char buf[64] = {0};
+    char ethwan_ifname[64] = {0};
+    BOOL ovsEnabled = FALSE;
+    BOOL ethwanEnabled = FALSE;
+    BOOL meshEbEnabled = FALSE;
+    INT lastKnownWanMode = -1;
+    BOOL configureBridge = FALSE;
+    INT bridgemode = 0;
+    WanBridgeCfgHandler pCfgHandler = NULL;
+    WAN_MODE_BRIDGECFG wanModeCfg = {0};
+
+    CcspTraceInfo(("Func %s Entered\n",__FUNCTION__));
+#if defined(INTEL_PUMA7)
+    pCfgHandler = EthLink_Hal_BridgeConfigIntelPuma7;
+#elif defined (_COSA_BCM_ARM_)
+    pCfgHandler = EthLink_Hal_BridgeConfigBcm;
+#endif
+
+    ethwanEnabled = EthLink_IsWanEnabled();
+
+#if defined (_BRIDGE_UTILS_BIN_)
+    if( 0 == syscfg_get( NULL, "mesh_ovs_enable", buf, sizeof( buf ) ) )
+    {
+          if ( strcmp (buf,"true") == 0 )
+            ovsEnabled = TRUE;
+          else
+            ovsEnabled = FALSE;
+
+    }
+    else
+    {
+          CcspTraceError(("syscfg_get failed to retrieve ovs_enable\n"));
+
+    }
+    if( (0 == access( ONEWIFI_ENABLED , F_OK )) || (0 == access( OPENVSWITCH_LOADED, F_OK ))
+                                                || (access(WFO_ENABLED, F_OK) == 0 ) )
+    {
+        CcspTraceInfo(("%s Setting ovsEnabled to TRUE [OneWifi/WFO]\n",__FUNCTION__));
+        ovsEnabled = TRUE;
+    }
+#endif
+
+    memset(buf,0,sizeof(buf));
+    if (syscfg_get(NULL, "bridge_mode", buf, sizeof(buf)) == 0)
+    {
+        bridgemode = atoi(buf);
+    }
+
+    memset(buf,0,sizeof(buf));
+    if (syscfg_get(NULL, "eb_enable", buf, sizeof(buf)) == 0)
+    {
+        if (strcmp(buf,"true") == 0)
+        {
+            meshEbEnabled = TRUE;
+        }
+        else
+        {
+            meshEbEnabled = FALSE;
+        }
+    }
+
+
+    memset(buf,0,sizeof(buf));
+    if (!syscfg_get(NULL, "wan_physical_ifname", buf, sizeof(buf)))
+    {
+        strcpy(wanPhyName, buf);
+        printf("wanPhyName = %s\n", wanPhyName);
+    }
+    else
+    {
+        strcpy(wanPhyName, "erouter0");
+
+    }
+
+    // Do wan interface bridge creation/deletion only if last detected wan and current detected wan interface are different.
+    // Hence deciding here whether wan bridge creation/deletion (configureBridge) is
+    // needed or not based on "lastKnownWanMode and ethwanEnabled" value.
+    memset(buf,0,sizeof(buf));
+    if (syscfg_get(NULL, "last_wan_mode", buf, sizeof(buf)) == 0)
+    {
+        lastKnownWanMode = atoi(buf);
+    }
+
+    // last  known mode will be updated by wan manager after
+    // this finalize api operation done. Till that lastknownmode will be previous detected wan.
+    switch (lastKnownWanMode)
+    {
+        case WAN_MODE_DOCSIS:
+            {
+                if (ethwanEnabled == TRUE)
+                {
+                    configureBridge = TRUE;
+                }
+            }
+            break;
+        case WAN_MODE_ETH:
+            {
+                if (ethwanEnabled == FALSE)
+                {
+                    configureBridge = TRUE;
+                }
+            }
+            break;
+        default:
+            {
+                // if last known mode is unknown, then default last wan mode is primary wan.
+                // Hence if ethwan is enabled when last known mode is primary, then configure bridge.
+                // Note: Configure bridge will need to do when prev wan mode and new wan mode is different.
+                if (ethwanEnabled == TRUE)
+                {
+                    configureBridge = TRUE;
+                }
+            }
+            break;
+    }
+
+    CcspTraceInfo((" %s isAutoWanMode: %d lastknownmode: %d ethwanEnabled: %d ConfigureBridge: %d bridgemode: %d\n",
+                __FUNCTION__,
+                isAutoWanMode,
+                lastKnownWanMode,
+                ethwanEnabled,
+                configureBridge,
+                bridgemode));
+
+        //Get the ethwan interface name from HAL
+    memset( ethwan_ifname , 0, sizeof( ethwan_ifname ) );
+    if ((0 != GWP_GetEthWanInterfaceName((unsigned char*) ethwan_ifname, sizeof(ethwan_ifname)))
+            || (0 == strnlen(ethwan_ifname,sizeof(ethwan_ifname)))
+            || (0 == strncmp(ethwan_ifname,"disable",sizeof(ethwan_ifname))))
+
+    {
+        //Fallback case needs to set it default
+        memset( ethwan_ifname , 0, sizeof( ethwan_ifname ) );
+        sprintf( ethwan_ifname , "%s", ETHWAN_DEF_INTF_NAME );
+    }
+    wanModeCfg.bridgemode = bridgemode;
+    wanModeCfg.ovsEnabled = ovsEnabled;
+    wanModeCfg.ethWanEnabled = ethwanEnabled;
+    wanModeCfg.meshEbEnabled = meshEbEnabled;
+    wanModeCfg.configureBridge = configureBridge;
+    snprintf(wanModeCfg.wanPhyName,sizeof(wanModeCfg.wanPhyName),"%s",wanPhyName);
+    snprintf(wanModeCfg.ethwan_ifname,sizeof(wanModeCfg.ethwan_ifname),"%s",ethwan_ifname);
+
+    if (pCfgHandler)
+    {
+        pCfgHandler(&wanModeCfg);
+    }
+
+
+   if (TRUE == configureBridge)
+   {
+       CcspTraceInfo(("Wanmode is Changing restarting Mta agent"));
+       v_secure_system ("killall CcspMtaAgentSsp");
+
+   }
+
+    if (TRUE == isAutoWanMode)
+    {
+        v_secure_system("sysevent set phylink_wan_state up");
+        if ( 0 != access( "/tmp/autowan_iface_finalized" , F_OK ) )
+        {
+            v_secure_system("touch /tmp/autowan_iface_finalized");
+        }
+	//Update Wan.Name here.
+        //UpdateInformMsgToWanMgr();
+
+    }
+    return ANSC_STATUS_SUCCESS;
+}
+
+static INT EthLink_Hal_BridgeConfigIntelPuma7(WAN_MODE_BRIDGECFG *pCfg)
+{
+    if (!pCfg)
+        return -1;
+
+    if (pCfg->ethWanEnabled == TRUE)
+    {
+        if (pCfg->ovsEnabled == TRUE)
+        {
+            v_secure_system("/usr/bin/bridgeUtils del-port brlan0 %s",pCfg->ethwan_ifname);
+        }
+        else
+        {
+            v_secure_system("brctl delif brlan0 %s",pCfg->ethwan_ifname);
+
+        }
+
+
+        if (TRUE == pCfg->configureBridge)
+        {
+            macaddr_t macAddr;
+            char wan_mac[18];
+
+            if (TRUE == pCfg->meshEbEnabled)
+            {
+                v_secure_system("/bin/sh /etc/utopia/service.d/vlan_util_xb7.sh meshethbhaul-removeEthwan 0");
+            }
+            v_secure_system("ifconfig %s down",pCfg->ethwan_ifname);
+            v_secure_system("ip addr flush dev %s",pCfg->ethwan_ifname);
+            v_secure_system("ip -6 addr flush dev %s",pCfg->ethwan_ifname);
+            v_secure_system("sysctl -w net.ipv6.conf.%s.accept_ra=0",pCfg->ethwan_ifname);
+            v_secure_system("ifconfig %s down; ip link set %s name dummy-rf", pCfg->wanPhyName,pCfg->wanPhyName);
+
+            v_secure_system("brctl addbr %s", pCfg->wanPhyName);
+            v_secure_system("brctl addif %s %s", pCfg->wanPhyName,pCfg->ethwan_ifname);
+            v_secure_system("sysctl -w net.ipv6.conf.%s.autoconf=0", pCfg->ethwan_ifname);
+            v_secure_system("sysctl -w net.ipv6.conf.%s.disable_ipv6=1", pCfg->ethwan_ifname);
+            v_secure_system("ip6tables -I OUTPUT -o %s -p icmpv6 -j DROP", pCfg->ethwan_ifname);
+            if (0 != pCfg->bridgemode)
+            {
+                v_secure_system("/bin/sh /etc/utopia/service.d/service_bridge_puma7.sh bridge-restart");
+            }
+
+            EthLink_BridgeNfDisable(pCfg->wanPhyName, NF_ARPTABLE, TRUE);
+            EthLink_BridgeNfDisable(pCfg->wanPhyName, NF_IPTABLE, TRUE);
+            EthLink_BridgeNfDisable(pCfg->wanPhyName, NF_IP6TABLE, TRUE);
+
+            v_secure_system("ip link set %s up",ETHWAN_DOCSIS_INF_NAME);
+            v_secure_system("brctl addif %s %s", pCfg->wanPhyName,ETHWAN_DOCSIS_INF_NAME);
+            v_secure_system("sysctl -w net.ipv6.conf.%s.disable_ipv6=1",ETHWAN_DOCSIS_INF_NAME);
+
+            memset(&macAddr,0,sizeof(macaddr_t));
+            EthLink_GetInterfaceMacAddress(&macAddr,"dummy-rf"); //dummy-rf is renamed from erouter0
+            memset(wan_mac,0,sizeof(wan_mac));
+            snprintf(wan_mac, sizeof(wan_mac), "%02x:%02x:%02x:%02x:%02x:%02x", macAddr.hw[0], macAddr.hw[1], macAddr.hw[2],
+                    macAddr.hw[3], macAddr.hw[4], macAddr.hw[5]);
+            v_secure_system("ifconfig %s down", pCfg->wanPhyName);
+            v_secure_system("ifconfig %s hw ether %s",  pCfg->wanPhyName,wan_mac);
+            v_secure_system("echo %s > /sys/bus/platform/devices/toe/in_if", pCfg->wanPhyName);
+            v_secure_system("ifconfig %s up", pCfg->wanPhyName);
+        }
+        else
+        {
+            v_secure_system("brctl addif %s %s", pCfg->wanPhyName,pCfg->ethwan_ifname);
+        }
+
+        v_secure_system("ifconfig %s up",pCfg->ethwan_ifname);
+        v_secure_system("cmctl down");
+
+    }
+    else
+    {
+        v_secure_system("brctl delif %s %s", pCfg->wanPhyName,pCfg->ethwan_ifname);
+
+        if (pCfg->ovsEnabled)
+        {
+            v_secure_system("/usr/bin/bridgeUtils add-port brlan0 %s",pCfg->ethwan_ifname);
+        }
+        else
+        {
+            v_secure_system("brctl addif brlan0 %s",pCfg->ethwan_ifname);
+        }
+
+        if (TRUE == pCfg->configureBridge)
+        {
+            if (TRUE == pCfg->meshEbEnabled)
+            {
+                v_secure_system("/bin/sh /etc/utopia/service.d/vlan_util_xb7.sh meshethbhaul-up 0");
+            }
+            if (0 != pCfg->bridgemode)
+            {
+                v_secure_system("/bin/sh /etc/utopia/service.d/service_bridge_puma7.sh bridge-restart");
+            }
+
+            v_secure_system("brctl delif %s %s", pCfg->wanPhyName,ETHWAN_DOCSIS_INF_NAME);
+            v_secure_system("ifconfig %s down", pCfg->wanPhyName);
+            v_secure_system("brctl delbr %s", pCfg->wanPhyName);
+            v_secure_system("ip link set dummy-rf name %s", pCfg->wanPhyName);
+            v_secure_system("echo %s > /sys/bus/platform/devices/toe/in_if", pCfg->wanPhyName);
+            v_secure_system("ifconfig %s up", pCfg->wanPhyName);
+       }
+    }
+
+    return 0;
+
+}
+
+static INT EthLink_Hal_BridgeConfigBcm(WAN_MODE_BRIDGECFG *pCfg)
+{
+    if (!pCfg)
+        return -1;
+
+    if (pCfg->ethWanEnabled == TRUE)
+    {
+        if (pCfg->ovsEnabled == TRUE)
+        {
+            v_secure_system("/usr/bin/bridgeUtils del-port brlan0 %s",pCfg->ethwan_ifname);
+        }
+        else
+        {
+            v_secure_system("brctl delif brlan0 %s",pCfg->ethwan_ifname);
+
+        }
+
+        if (TRUE == pCfg->configureBridge)
+        {
+            v_secure_system("ifconfig %s down",pCfg->ethwan_ifname);
+            v_secure_system("ip addr flush dev %s",pCfg->ethwan_ifname);
+            v_secure_system("ip -6 addr flush dev %s",pCfg->ethwan_ifname);
+            v_secure_system("sysctl -w net.ipv6.conf.%s.accept_ra=0",pCfg->ethwan_ifname);
+
+            if (0 == pCfg->bridgemode)
+            {
+                CcspTraceInfo(("set CM0 %s wanif %s\n",ETHWAN_DOCSIS_INF_NAME,pCfg->wanPhyName));
+                v_secure_system("ifconfig %s down", pCfg->wanPhyName);
+                v_secure_system("ip link set %s name %s", pCfg->wanPhyName,ETHWAN_DOCSIS_INF_NAME);
+                v_secure_system("brctl addbr %s", pCfg->wanPhyName);
+                v_secure_system("brctl addif %s %s", pCfg->wanPhyName,pCfg->ethwan_ifname);
+
+                v_secure_system("sysctl -w net.ipv6.conf.%s.autoconf=0", pCfg->ethwan_ifname);
+                v_secure_system("sysctl -w net.ipv6.conf.%s.disable_ipv6=1", pCfg->ethwan_ifname);
+                v_secure_system("ip6tables -I OUTPUT -o %s -p icmpv6 -j DROP", pCfg->ethwan_ifname);
+                v_secure_system("ip link set %s up",ETHWAN_DOCSIS_INF_NAME);
+                v_secure_system("brctl addif %s %s", pCfg->wanPhyName,ETHWAN_DOCSIS_INF_NAME);
+                v_secure_system("sysctl -w net.ipv6.conf.%s.disable_ipv6=1",ETHWAN_DOCSIS_INF_NAME);
+            }
+            else
+            {
+#if defined (ENABLE_WANMODECHANGE_NOREBOOT)
+                v_secure_system("touch /tmp/wanmodechange");
+                if (pCfg->ovsEnabled)
+                {
+                    v_secure_system("/usr/bin/bridgeUtils multinet-syncMembers 1");
+                    v_secure_system("/usr/bin/bridgeUtils del-port brlan0 %s",pCfg->ethwan_ifname);
+                }
+                else
+                {
+
+#if defined (_CBR2_PRODUCT_REQ_)
+                    v_secure_system("/bin/sh /etc/utopia/service.d/vlan_util_tchcbr.sh multinet-syncMembers 1");
+#else
+                    v_secure_system("/bin/sh /etc/utopia/service.d/vlan_util_tchxb6.sh multinet-syncMembers 1");
+#endif
+                    v_secure_system("brctl delif brlan0 %s",pCfg->ethwan_ifname);
+                }
+                v_secure_system("rm /tmp/wanmodechange");
+#endif
+
+                v_secure_system("brctl addif %s %s", pCfg->wanPhyName,pCfg->ethwan_ifname);
+            }
+        }
+        else
+        {
+            v_secure_system("brctl addif %s %s", pCfg->wanPhyName,pCfg->ethwan_ifname);
+        }
+
+        v_secure_system("ifconfig %s up",pCfg->ethwan_ifname);
+
+    }
+    else
+    {
+        v_secure_system("brctl delif %s %s", pCfg->wanPhyName,pCfg->ethwan_ifname);
+
+        if (pCfg->ovsEnabled)
+        {
+            v_secure_system("/usr/bin/bridgeUtils add-port brlan0 %s",pCfg->ethwan_ifname);
+        }
+        else
+        {
+            v_secure_system("brctl addif brlan0 %s",pCfg->ethwan_ifname);
+        }
+        if (TRUE == pCfg->configureBridge)
+        {
+            if (0 == pCfg->bridgemode)
+            {
+                v_secure_system("brctl delif %s %s", pCfg->wanPhyName,ETHWAN_DOCSIS_INF_NAME);
+                v_secure_system("ifconfig %s down", pCfg->wanPhyName);
+                v_secure_system("brctl delbr %s", pCfg->wanPhyName);
+                v_secure_system("ifconfig %s down", ETHWAN_DOCSIS_INF_NAME);
+                v_secure_system("ip link set %s name %s", ETHWAN_DOCSIS_INF_NAME,pCfg->wanPhyName);
+                v_secure_system("ifconfig %s up", pCfg->wanPhyName);
+                // BCOMB-1508 - update 2 into /sys/class/net/erouter0/netdev_group
+                v_secure_system("ip link set dev %s group 2", pCfg->wanPhyName);
+                v_secure_system("echo addif %s > /proc/driver/flowmgr/cmd", pCfg->wanPhyName);
+                v_secure_system("echo delif %s > /proc/driver/flowmgr/cmd", ETHWAN_DOCSIS_INF_NAME);
+            }
+            else
+            {
+#if defined (ENABLE_WANMODECHANGE_NOREBOOT)
+                v_secure_system("touch /tmp/wanmodechange");
+                if (pCfg->ovsEnabled)
+                {
+                    v_secure_system("/usr/bin/bridgeUtils multinet-syncMembers 1");
+                }
+                else
+                {
+#if defined (_CBR2_PRODUCT_REQ_)
+                    v_secure_system("/bin/sh /etc/utopia/service.d/vlan_util_tchcbr.sh multinet-syncMembers 1");
+#else
+                    v_secure_system("/bin/sh /etc/utopia/service.d/vlan_util_tchxb6.sh multinet-syncMembers 1");
+#endif
+                }
+                v_secure_system("rm /tmp/wanmodechange");
+#endif
+            }
+
+        }
+    }
+
+    return 0;
+}
+
+static BOOL EthLink_IsWanEnabled()
+{
+    char buf[64];
+    memset(buf,0,sizeof(buf));
+    if (syscfg_get(NULL, "eth_wan_enabled", buf, sizeof(buf)) == 0)
+    {
+        if ( 0 == strcmp(buf,"true"))
+        {
+
+            if ( 0 == access( "/nvram/ETHWAN_ENABLE" , F_OK ) )
+            {
+                return TRUE;
+            }
+        }
+    }
+    return FALSE;
+}
+
+
+static void EthLink_GetInterfaceMacAddress(macaddr_t* macAddr,char *pIfname)
+{
+    FILE *f = NULL;
+    char line[256], *lineptr = line, fname[128];
+    size_t size;
+
+    if (pIfname)
+    {
+        snprintf(fname,sizeof(fname), "/sys/class/net/%s/address", pIfname);
+        size = sizeof(line);
+        if ((f = fopen(fname, "r")))
+        {
+            if ((getline(&lineptr, &size, f) >= 0))
+            {
+                sscanf(lineptr, "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx", &macAddr->hw[0], &macAddr->hw[1], &macAddr->hw[2], &macAddr->hw[3], &macAddr->hw[4], &macAddr->hw[5]);
+            }
+            fclose(f);
+        }
+    }
+
+    return;
+}
+
+static INT EthLink_BridgeNfDisable( const char* bridgeName, bridge_nf_table_t table, BOOL disable )
+{
+    INT ret = 0;
+    char disableFile[100] = {0};
+    char* pTableName = NULL;
+
+    if (bridgeName == NULL)
+    {
+        CcspTraceError(("bridgeName is NULLn"));
+        return -1;
+    }
+
+    switch (table)
+    {
+        case NF_ARPTABLE:
+            pTableName = "nf_disable_arptables";
+            break;
+        case NF_IPTABLE:
+            pTableName = "nf_disable_iptables";
+            break;
+        case NF_IP6TABLE:
+            pTableName = "nf_disable_ip6tables";
+            break;
+        default:
+            // invalid table
+            CcspTraceError(("Invalid table: %d\n", table));
+            return -1;
+    }
+
+    snprintf(disableFile, sizeof(disableFile), "/sys/devices/virtual/net/%s/bridge/%s",bridgeName, pTableName);
+    int fd = open(disableFile, O_WRONLY);
+    if (fd != -1)
+    {
+        ret = 0;
+        char val = disable ? '1' : '0';
+        int num = write(fd, &val, 1);
+        if (num != 1)
+        {
+            CcspTraceError(("Failed to write: %d\n", num));
+            ret = -1;
+        }
+
+        close(fd);
+    }
+    else
+    {
+        CcspTraceError(("Failed to open %s\n", disableFile));
+        ret = -1;
+    }
+
+    return ret;
+}
+#endif //COMCAST_VLAN_HAL_ENABLED

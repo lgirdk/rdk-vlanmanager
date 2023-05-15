@@ -68,8 +68,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(VLAN_MANAGER_HAL_ENABLED)
 #include "json_hal_common.h"
-
+#endif
 #ifndef TRUE
 #define TRUE     1
 #endif

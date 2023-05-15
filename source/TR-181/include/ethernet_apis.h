@@ -118,6 +118,66 @@ _DML_ETHERNET
 }
 DML_ETHERNET,  *PDML_ETHERNET;
 
+#if defined(COMCAST_VLAN_HAL_ENABLED)
+typedef struct _WAN_MODE_BRIDGECFG
+{
+    INT bridgemode;
+    BOOL ovsEnabled;
+    BOOL ethWanEnabled;
+    BOOL configureBridge;
+    BOOL meshEbEnabled;
+    CHAR ethwan_ifname[64];
+    CHAR wanPhyName[64];
+}WAN_MODE_BRIDGECFG;
+
+typedef enum WanMode
+{
+    WAN_MODE_AUTO = 0,
+    WAN_MODE_ETH,
+    WAN_MODE_DOCSIS,
+    WAN_MODE_UNKNOWN
+}WanMode_t;
+
+typedef enum
+{
+    NF_ARPTABLE,
+    NF_IPTABLE,
+    NF_IP6TABLE
+} bridge_nf_table_t;
+
+#define ONEWIFI_ENABLED "/etc/onewifi_enabled"
+#define OPENVSWITCH_LOADED "/sys/module/openvswitch"
+#define WFO_ENABLED     "/etc/WFO_enabled"
+
+#if defined (_XB7_PRODUCT_REQ_) && defined (_COSA_BCM_ARM_)
+#define ETHWAN_DEF_INTF_NAME "eth3"
+#elif defined (_CBR2_PRODUCT_REQ_)
+#define ETHWAN_DEF_INTF_NAME "eth5"
+#elif defined (INTEL_PUMA7)
+#define ETHWAN_DEF_INTF_NAME "nsgmii0"
+#elif defined (_PLATFORM_TURRIS_)
+#define ETHWAN_DEF_INTF_NAME "eth2"
+#else
+#define ETHWAN_DEF_INTF_NAME "eth0"
+#endif
+
+
+#ifdef _COSA_BCM_ARM_
+#define ETHWAN_DOCSIS_INF_NAME "cm0"
+#elif defined(INTEL_PUMA7)
+#define ETHWAN_DOCSIS_INF_NAME "dpdmta1"
+#else
+#define ETHWAN_DOCSIS_INF_NAME "cm0"
+#endif
+
+typedef struct
+{
+  uint8_t  hw[6];
+} macaddr_t;
+
+typedef INT (*WanBridgeCfgHandler)(WAN_MODE_BRIDGECFG *pcfg);
+#endif //COMCAST_VLAN_HAL_ENABLED
+
 static inline void DML_ETHERNET_INIT(PDML_ETHERNET pEth)
 {
     pEth->Enable                 = FALSE;

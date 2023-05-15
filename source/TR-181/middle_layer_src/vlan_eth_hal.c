@@ -65,7 +65,9 @@
 * PROJECT-SPECIFIC INCLUDE FILES
 *****************************************************************************/
 #include "vlan_eth_hal.h"
+#if defined(VLAN_MANAGER_HAL_ENABLED)
 #include "json_hal_client.h"
+#endif
 #include "ansc_platform.h"
 /***************************************************************************************
 * GLOBAL SYMBOLS
