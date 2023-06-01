@@ -177,6 +177,7 @@ int vlan_eth_hal_createInterface(vlan_configuration_t *config)
     snprintf(param.value, sizeof(param.value), "%d", config->TPId);
     param.type = PARAM_UNSIGNED_INTEGER;
     json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
+    CcspTraceInfo(("%s-%d: skbMarkingNumOfEntries=%d \n", __FUNCTION__, __LINE__, (*config).skbMarkingNumOfEntries ));
     for (int i = 0; i < (*config).skbMarkingNumOfEntries; ++i)
     {
         memset(&param, 0, sizeof(param));
@@ -268,6 +269,7 @@ int vlan_eth_hal_setMarkings(vlan_configuration_t *config)
     snprintf(param.value, sizeof(param.value), "%d", config->TPId);
     param.type = PARAM_UNSIGNED_INTEGER;
     json_hal_add_param(jmsg, SET_REQUEST_MESSAGE, &param);
+    CcspTraceInfo(("%s-%d: skbMarkingNumOfEntries=%d \n", __FUNCTION__, __LINE__, (*config).skbMarkingNumOfEntries ));
     for (int i = 0; i < (*config).skbMarkingNumOfEntries; ++i)
     {
         memset(&param, 0, sizeof(param));

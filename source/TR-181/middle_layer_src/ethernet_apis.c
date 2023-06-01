@@ -897,10 +897,12 @@ ANSC_STATUS EthLink_GetMarking(char *ifname, vlan_configuration_t *pVlanCfg)
         if (Found && (p_EthLink != NULL))
         {
             //Vlan Marking Info
+            CcspTraceInfo(("%s-%d: NumberofMarkingEntries=%d \n", __FUNCTION__, __LINE__, p_EthLink->NumberofMarkingEntries));
             if (p_EthLink->NumberofMarkingEntries > 0)
             {
                 //allocate memory to vlan_skb_config_t, free it once used.
-		pVlanCfg->skb_config = (vlan_skb_config_t*)malloc( p_EthLink->NumberofMarkingEntries * sizeof(vlan_skb_config_t) );
+                pVlanCfg->skbMarkingNumOfEntries = p_EthLink->NumberofMarkingEntries;
+                pVlanCfg->skb_config = (vlan_skb_config_t*)malloc( p_EthLink->NumberofMarkingEntries * sizeof(vlan_skb_config_t) );
                 for(int i = 0; i < p_EthLink->NumberofMarkingEntries; i++)
                 {
                     PCOSA_DML_MARKING pDataModelMarking = (PCOSA_DML_MARKING)&(p_EthLink->pstDataModelMarking[i]);
@@ -910,15 +912,18 @@ ANSC_STATUS EthLink_GetMarking(char *ifname, vlan_configuration_t *pVlanCfg)
                         pVlanCfg->skb_config[i].skbPort = pDataModelMarking->SKBPort;
                         pVlanCfg->skb_config[i].skbMark = pDataModelMarking->SKBMark;
                         pVlanCfg->skb_config[i].skbEthPriorityMark = pDataModelMarking->EthernetPriorityMark;
+                        CcspTraceInfo(("%s-%d: Ins[%d] Alias[%s] SKBPort[%u] SKBMark[%u] EthernetPriorityMark[%d]\n", __FUNCTION__,
+                                        __LINE__, (i + 1), pVlanCfg->skb_config[i].alias, pVlanCfg->skb_config[i].skbPort,
+                                         pVlanCfg->skb_config[i].skbMark, pVlanCfg->skb_config[i].skbEthPriorityMark ));
                     }
-		    else
-		    {
+                    else
+                    {
                           CcspTraceError(("%s-%d: pDataModelMarking Or pVlanCfg->skb_config are Null \n", __FUNCTION__, __LINE__));
                           return ANSC_STATUS_FAILURE;
-		    }
+                    }
                 }
             }
-	    returnStatus = ANSC_STATUS_SUCCESS;
+            returnStatus = ANSC_STATUS_SUCCESS;
         }
     }
 
