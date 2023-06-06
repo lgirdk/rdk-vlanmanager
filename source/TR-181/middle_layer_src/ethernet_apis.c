@@ -76,7 +76,7 @@
 #define WAN_COMPONENT_NAME                "eRT.com.cisco.spvtg.ccsp.wanmanager"
 
 #if defined(WAN_MANAGER_UNIFICATION_ENABLED)
-#define WAN_IF_LINK_STATUS                "Device.X_RDK_WanManager.Interface.%d.VirtualInterface.1.VLAN.Status"
+#define WAN_IF_LINK_STATUS                "Device.X_RDK_WanManager.Interface.%d.VirtualInterface.1.VlanStatus"
 #define WAN_MARKING_NOE_PARAM_NAME        "Device.X_RDK_WanManager.Interface.%d.MarkingNumberOfEntries"
 #define WAN_MARKING_TABLE_NAME            "Device.X_RDK_WanManager.Interface.%d.Marking."
 #else
