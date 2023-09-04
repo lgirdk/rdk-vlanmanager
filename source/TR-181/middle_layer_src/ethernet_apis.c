@@ -201,15 +201,12 @@ EthLink_GetStatus
     ethernet_link_status_e status;
 
     if (pEntry != NULL) {
-        if (pEntry->Enable)
-        {
-            if ( ANSC_STATUS_SUCCESS != EthLink_GetUnTaggedVlanInterfaceStatus(pEntry->Name, &status)) {
-                pEntry->Status = ETH_IF_ERROR;
-                CcspTraceError(("%s %d - %s: Failed to get interface status for this\n", __FUNCTION__,__LINE__, pEntry->Name));
-            }
-            else {
-                pEntry->Status = status;
-            }
+        if ( ANSC_STATUS_SUCCESS != EthLink_GetUnTaggedVlanInterfaceStatus(pEntry->Name, &status)) {
+            pEntry->Status = ETH_IF_ERROR;
+            CcspTraceError(("%s %d - %s: Failed to get interface status for this\n", __FUNCTION__,__LINE__, pEntry->Name));
+        }
+        else {
+            pEntry->Status = status;
         }
     }
     return returnStatus;
@@ -320,6 +317,7 @@ ANSC_STATUS EthLink_Enable(PDML_ETHERNET  pEntry)
 
             iIterator++;
             sleep(2);
+            CcspTraceInfo(("%s-%d: Interface Status(%d), retry-count=%d \n", __FUNCTION__, __LINE__, status, iIterator));
         }
         pEntry->Status = ETH_IF_UP;
         CcspTraceInfo(("%s - %s:Successfully created UnTagged VLAN Interface(%s)\n",__FUNCTION__, ETH_MARKER_VLAN_IF_CREATE, pEntry->Name));
@@ -984,6 +982,7 @@ static ANSC_STATUS EthLink_TriggerVlanRefresh(PDML_ETHERNET pEntry )
 
         iIterator++;
         sleep(2);
+        CcspTraceInfo(("%s-%d: Interface Status(%d), retry-count=%d \n", __FUNCTION__, __LINE__, status, iIterator));
     }
 
     if(!strncmp(pEntry->Alias, "veip", 4))

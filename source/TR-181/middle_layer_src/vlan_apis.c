@@ -198,17 +198,14 @@ Vlan_GetStatus
 
     if ( pEntry != NULL )
     {
-        if (pEntry->Enable)
+        if (ANSC_STATUS_SUCCESS != Vlan_GetTaggedVlanInterfaceStatus(pEntry->Name, &status))
         {
-            if (ANSC_STATUS_SUCCESS != Vlan_GetTaggedVlanInterfaceStatus(pEntry->Name, &status))
-            {
-                pEntry->Status = VLAN_IF_ERROR;
-                CcspTraceError(("%s-%d: Failed to Get Tagged Vlan Interface=%s Status \n", __FUNCTION__, __LINE__, pEntry->Name));
-            }
-            else
-            {
-                pEntry->Status = status;
-            }
+            pEntry->Status = VLAN_IF_ERROR;
+            CcspTraceError(("%s-%d: Failed to Get Tagged Vlan Interface=%s Status \n", __FUNCTION__, __LINE__, pEntry->Name));
+        }
+        else
+        {
+            pEntry->Status = status;
         }
     }
     return returnStatus;
@@ -652,6 +649,7 @@ void * Vlan_Enable(void *Arg)
 
             iIterator++;
             sleep(2);
+            CcspTraceInfo(("%s-%d: Interface Status(%d), retry-count=%d \n", __FUNCTION__, __LINE__, status, iIterator));
         }
         long uptime = 0;
         get_uptime(&uptime);
