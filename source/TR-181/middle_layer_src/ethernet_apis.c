@@ -700,6 +700,9 @@ static ANSC_STATUS EthLink_AddMarking(PDML_ETHERNET pEntry)
 
     iTotalNoofEntries = atoi(acTmpReturnValue);
 
+    // Intialise VlanCfg object.
+    memset(&VlanCfg, 0, sizeof(VlanCfg));
+
     VlanCfg.skbMarkingNumOfEntries = iTotalNoofEntries;
 
     if( VlanCfg.skbMarkingNumOfEntries > 0 )
