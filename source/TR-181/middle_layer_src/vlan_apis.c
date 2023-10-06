@@ -493,7 +493,7 @@ static ANSC_STATUS Vlan_SetMacAddr( PDML_VLAN pEntry )
     snprintf(macStr, sizeof(macStr), "%c%c:%c%c:%c%c:%c%c:%c%c:%c%c",
     hex[0], hex[1], hex[2], hex[3], hex[4], hex[5], hex[6], hex[7], hex[8], hex[9], hex[10], hex[11]);
 
-    snprintf(command, sizeof(command), "ip link set dev %s.%d address %s\n",pEntry->Alias, pEntry->VLANId, macStr);
+    snprintf(command, sizeof(command), "ip link set dev %s address %s\n",pEntry->Name, macStr);
     v_secure_system(command);
     memset(command, 0, sizeof(command));
 
