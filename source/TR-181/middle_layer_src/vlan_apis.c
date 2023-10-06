@@ -118,9 +118,6 @@ void get_uptime(long *uptime)
 #if !defined(VLAN_MANAGER_HAL_ENABLED)
 static ANSC_STATUS Vlan_DeleteInterface(PDML_VLAN p_Vlan)
 {
-     char wan_interface[10] = {0};
-     char buff[10] =  {0};
-
      if (NULL == p_Vlan)
      {
           CcspTraceError(("Error: Invalid arguement \n"));
