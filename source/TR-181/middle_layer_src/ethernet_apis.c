@@ -126,7 +126,7 @@ static INT EthLink_BridgeNfDisable( const char* bridgeName, bridge_nf_table_t ta
 #endif
 /* *************************************************************************************************** */
 
-static int sysctl_iface_set(const char *path, const char *ifname, const char *content)
+int sysctl_iface_set(const char *path, const char *ifname, const char *content)
 {
     char buf[128];
     char *filename;
