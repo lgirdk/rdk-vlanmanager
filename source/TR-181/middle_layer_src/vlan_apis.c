@@ -62,6 +62,8 @@ extern token_t sysevent_token;
 #endif
 static pthread_mutex_t vlan_access_mutex;
 
+extern int sysctl_iface_set(const char *path, const char *ifname, const char *content);
+
 static ANSC_STATUS Vlan_CreateTaggedInterface(PDML_VLAN pEntry);
 static ANSC_STATUS Vlan_SetEthLink(PDML_VLAN pEntry, BOOL enable, BOOL PriTag);
 extern ANSC_STATUS EthLink_SendVirtualIfaceVlanStatus(char *path, char *vlanStatus);
@@ -578,6 +580,8 @@ static ANSC_STATUS Vlan_CreateTaggedInterface(PDML_VLAN pEntry)
     v_secure_system("ip link add link %s name %s type vlan id %u", pEntry->Alias , pEntry->Name, pEntry->VLANId);
 
     v_secure_system("ip link set %s up", pEntry->Name);
+
+    sysctl_iface_set("/proc/sys/net/ipv6/conf/%s/accept_ra", pEntry->Name, "2");
 
     if (Vlan_SetMacAddr(pEntry) == ANSC_STATUS_FAILURE)
     {
