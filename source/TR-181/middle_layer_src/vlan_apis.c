@@ -70,6 +70,39 @@ static ANSC_STATUS Vlan_DeleteInterface(PDML_VLAN p_Vlan);
 static ANSC_STATUS Vlan_SetMacAddr(PDML_VLAN pEntry);
 #endif
 
+#if !defined(VLAN_MANAGER_HAL_ENABLED)
+static int sysctl_iface_set(const char *path, const char *ifname, const char *content)
+{
+    char buf[128];
+    char *filename;
+    size_t len;
+    int fd;
+
+    if (ifname) {
+        snprintf(buf, sizeof(buf), path, ifname);
+        filename = buf;
+    }
+    else
+        filename = path;
+
+    if ((fd = open(filename, O_WRONLY)) < 0) {
+        perror("Failed to open file");
+        return -1;
+    }
+
+    len = strlen(content);
+    if (write(fd, content, len) != (ssize_t) len) {
+        perror("Failed to write to file");
+        close(fd);
+        return -1;
+    }
+
+    close(fd);
+
+    return 0;
+}
+#endif
+
 /*****************************************************************/
 //VLAN APIs
 
@@ -565,6 +598,8 @@ static ANSC_STATUS Vlan_CreateTaggedInterface(PDML_VLAN pEntry)
     v_secure_system("ip link add link %s name %s type vlan id %u", pEntry->Alias , pEntry->Name, pEntry->VLANId);
 
     v_secure_system("ip link set %s up", pEntry->Name);
+
+    sysctl_iface_set("/proc/sys/net/ipv6/conf/%s/accept_ra", pEntry->Name, "2");
 
     if (Vlan_SetMacAddr(pEntry) == ANSC_STATUS_FAILURE)
     {
