@@ -51,7 +51,7 @@
 
 /* **************************************************************************************************** */
 #define DATAMODEL_PARAM_LENGTH 256
-#define PARAM_SIZE 10
+#define PARAM_SIZE_10 10
 #define PARAM_SIZE_32 32
 #define PARAM_SIZE_64 64
 
@@ -434,7 +434,7 @@ ANSC_STATUS DmlEthGetParamValues(
         {
             free_parameterValStruct_t(bus_handle, nval, retVal);
         }
-
+        CcspTraceInfo(("%s %d: GET : %s = %s \n", __FUNCTION__, __LINE__, pParamName, pReturnVal));
         return ANSC_STATUS_SUCCESS;
     }
 
@@ -605,7 +605,7 @@ static int EthLink_GetActiveWanInterfaces(char *Alias)
         return activeIface;
     }
 
-    strcpy(paramName, "dmsb.wanmanager.wanifcount");
+    strncpy(paramName, "dmsb.wanmanager.wanifcount", sizeof(paramName) - 1);
     retPsmGet = PSM_VALUE_GET_VALUE(paramName, strValue);
     if((retPsmGet == CCSP_SUCCESS) && (strValue != NULL))
     {
@@ -667,13 +667,12 @@ static ANSC_STATUS EthLink_DeleteMarking(PDML_ETHERNET pEntry)
 static ANSC_STATUS EthLink_AddMarking(PDML_ETHERNET pEntry)
 {
     char acGetParamName[256] = {0};
-    char acSetParamName[256] = {0};
     char acTmpReturnValue[256] = {0};
     char a2cTmpTableParams[16][256] = {0};
     INT iLoopCount = 0;
     INT iTotalNoofEntries = 0;
     INT iWANInstance   = -1;
-    vlan_configuration_t VlanCfg;
+    vlan_configuration_t VlanCfg = {0};
 
     if (pEntry == NULL )
     {
@@ -689,81 +688,72 @@ static ANSC_STATUS EthLink_AddMarking(PDML_ETHERNET pEntry)
     }
     CcspTraceInfo(("%s %d Wan Interface Instance:%d\n", __FUNCTION__, __LINE__, iWANInstance));
 
-    //Get Marking entries
     memset(acGetParamName, 0, sizeof(acGetParamName));
-    snprintf(acGetParamName, sizeof(acGetParamName), WAN_MARKING_NOE_PARAM_NAME, iWANInstance);
-    if ( ANSC_STATUS_FAILURE == DmlEthGetParamValues( WAN_COMPONENT_NAME, WAN_DBUS_PATH, acGetParamName, acTmpReturnValue ) )
+    snprintf(acGetParamName, sizeof(acGetParamName), WAN_MARKING_TABLE_NAME, iWANInstance);
+
+    if ( ANSC_STATUS_FAILURE == DmlEthGetParamNames(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acGetParamName, a2cTmpTableParams, &iTotalNoofEntries))
     {
-        CcspTraceError(("[%s][%d]Failed to get param value\n", __FUNCTION__, __LINE__));
+        CcspTraceError(("[%s][%d] Failed to get param value\n", __FUNCTION__, __LINE__));
         return ANSC_STATUS_FAILURE;
     }
 
-    iTotalNoofEntries = atoi(acTmpReturnValue);
+    // Intialise VlanCfg object.
+    memset(&VlanCfg, 0, sizeof(VlanCfg));
 
-    VlanCfg.skbMarkingNumOfEntries = iTotalNoofEntries;
-
-    if( VlanCfg.skbMarkingNumOfEntries > 0 )
+    if( iTotalNoofEntries > 0 )
     {
-       VlanCfg.skb_config = (vlan_skb_config_t*)malloc( iTotalNoofEntries * sizeof(vlan_skb_config_t) );
+        CcspTraceInfo(("%s %d: iTotalNoofEntries = %d\n", __FUNCTION__, __LINE__, iTotalNoofEntries));
 
-       if( NULL == VlanCfg.skb_config )
-       {
-          return ANSC_STATUS_FAILURE;
-       }
+        VlanCfg.skb_config = (vlan_skb_config_t*)malloc( iTotalNoofEntries * sizeof(vlan_skb_config_t) );
+        VlanCfg.skbMarkingNumOfEntries = iTotalNoofEntries;
 
-       iTotalNoofEntries = 0;
-
-       memset(acGetParamName, 0, sizeof(acGetParamName));
-       snprintf(acGetParamName, sizeof(acGetParamName), WAN_MARKING_TABLE_NAME, iWANInstance);
-
-       if ( ANSC_STATUS_FAILURE == DmlEthGetParamNames(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acGetParamName, a2cTmpTableParams, &iTotalNoofEntries))
-       {
-           CcspTraceError(("[%s][%d] Failed to get param value\n", __FUNCTION__, __LINE__));
-           return ANSC_STATUS_FAILURE;
-       }
-
-       for (iLoopCount = 0; iLoopCount < iTotalNoofEntries; iLoopCount++)
-       {
-           char acTmpQueryParam[256];
-
-           //Alias
-           memset(acTmpQueryParam, 0, sizeof(acTmpQueryParam));
-           snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), "%sAlias", a2cTmpTableParams[iLoopCount]);
-           memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
-           DmlEthGetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acTmpQueryParam, acTmpReturnValue);
-           snprintf(VlanCfg.skb_config[iLoopCount].alias, sizeof(VlanCfg.skb_config[iLoopCount].alias), "%s", acTmpReturnValue);
-
-           //SKBPort
-           memset(acTmpQueryParam, 0, sizeof(acTmpQueryParam));
-           snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), "%sSKBPort", a2cTmpTableParams[iLoopCount]);
-           memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
-           DmlEthGetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acTmpQueryParam, acTmpReturnValue);
-           VlanCfg.skb_config[iLoopCount].skbPort = atoi(acTmpReturnValue);
-
-           //SKBMark
-           memset(acTmpQueryParam, 0, sizeof(acTmpQueryParam));
-           snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), "%sSKBMark", a2cTmpTableParams[iLoopCount]);
-           memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
-           DmlEthGetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acTmpQueryParam, acTmpReturnValue);
-           VlanCfg.skb_config[iLoopCount].skbMark = atoi(acTmpReturnValue);
-
-           //EthernetPriorityMark
-           memset(acTmpQueryParam, 0, sizeof(acTmpQueryParam));
-           snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), "%sEthernetPriorityMark", a2cTmpTableParams[iLoopCount]);
-           memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
-           DmlEthGetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acTmpQueryParam, acTmpReturnValue);
-           VlanCfg.skb_config[iLoopCount].skbEthPriorityMark = atoi(acTmpReturnValue);
-
-           CcspTraceInfo(("WAN Marking - Ins[%d] Alias[%s] SKBPort[%u] SKBMark[%u] EthernetPriorityMark[%d]\n",
-                                                                iLoopCount + 1,
-                                                                VlanCfg.skb_config[iLoopCount].alias,
-                                                                VlanCfg.skb_config[iLoopCount].skbPort,
-                                                                VlanCfg.skb_config[iLoopCount].skbMark,
-                                                                VlanCfg.skb_config[iLoopCount].skbEthPriorityMark ));
+        if( NULL == VlanCfg.skb_config )
+        {
+            return ANSC_STATUS_FAILURE;
         }
+
+        for (iLoopCount = 0; iLoopCount < iTotalNoofEntries; iLoopCount++)
+        {
+            char acTmpQueryParam[256];
+
+            //Alias
+            memset(acTmpQueryParam, 0, sizeof(acTmpQueryParam));
+            snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), "%sAlias", a2cTmpTableParams[iLoopCount]);
+            memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
+            DmlEthGetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acTmpQueryParam, acTmpReturnValue);
+            snprintf(VlanCfg.skb_config[iLoopCount].alias, sizeof(VlanCfg.skb_config[iLoopCount].alias), "%s", acTmpReturnValue);
+
+            //SKBPort
+            memset(acTmpQueryParam, 0, sizeof(acTmpQueryParam));
+            snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), "%sSKBPort", a2cTmpTableParams[iLoopCount]);
+            memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
+            DmlEthGetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acTmpQueryParam, acTmpReturnValue);
+            VlanCfg.skb_config[iLoopCount].skbPort = atoi(acTmpReturnValue);
+
+            //SKBMark
+            memset(acTmpQueryParam, 0, sizeof(acTmpQueryParam));
+            snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), "%sSKBMark", a2cTmpTableParams[iLoopCount]);
+            memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
+            DmlEthGetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acTmpQueryParam, acTmpReturnValue);
+            VlanCfg.skb_config[iLoopCount].skbMark = atoi(acTmpReturnValue);
+
+            //EthernetPriorityMark
+            memset(acTmpQueryParam, 0, sizeof(acTmpQueryParam));
+            snprintf(acTmpQueryParam, sizeof(acTmpQueryParam), "%sEthernetPriorityMark", a2cTmpTableParams[iLoopCount]);
+            memset(acTmpReturnValue, 0, sizeof(acTmpReturnValue));
+            DmlEthGetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acTmpQueryParam, acTmpReturnValue);
+            VlanCfg.skb_config[iLoopCount].skbEthPriorityMark = atoi(acTmpReturnValue);
+
+            CcspTraceInfo(("WAN Marking - Ins[%d] Alias[%s] SKBPort[%u] SKBMark[%u] EthernetPriorityMark[%d]\n",
+                        iLoopCount + 1,
+                        VlanCfg.skb_config[iLoopCount].alias,
+                        VlanCfg.skb_config[iLoopCount].skbPort,
+                        VlanCfg.skb_config[iLoopCount].skbMark,
+                        VlanCfg.skb_config[iLoopCount].skbEthPriorityMark ));
+        }
+        //Create and initialise Marking data models
+        EthLink_CreateMarkingTable(pEntry, &VlanCfg);
     }
-    //Create and initialise Marking data models
-    EthLink_CreateMarkingTable(pEntry, &VlanCfg);
 
     //Free VlanCfg skb_config memory
     if (VlanCfg.skb_config != NULL)
@@ -818,18 +808,18 @@ ANSC_STATUS EthLink_GetMarking(char *ifname, vlan_configuration_t *pVlanCfg)
                     PCOSA_DML_MARKING pDataModelMarking = (PCOSA_DML_MARKING)&(p_EthLink->pstDataModelMarking[i]);
                     if ((pDataModelMarking != NULL) && (pVlanCfg->skb_config != NULL))
                     {
-                        strcpy(pVlanCfg->skb_config[i].alias, pDataModelMarking->Alias);
+                        strncpy(pVlanCfg->skb_config[i].alias, pDataModelMarking->Alias, sizeof(pVlanCfg->skb_config[i].alias) - 1);
                         pVlanCfg->skb_config[i].skbPort = pDataModelMarking->SKBPort;
                         pVlanCfg->skb_config[i].skbMark = pDataModelMarking->SKBMark;
                         pVlanCfg->skb_config[i].skbEthPriorityMark = pDataModelMarking->EthernetPriorityMark;
                         CcspTraceInfo(("%s-%d: Ins[%d] Alias[%s] SKBPort[%u] SKBMark[%u] EthernetPriorityMark[%d]\n", __FUNCTION__,
-                                        __LINE__, (i + 1), pVlanCfg->skb_config[i].alias, pVlanCfg->skb_config[i].skbPort,
-                                         pVlanCfg->skb_config[i].skbMark, pVlanCfg->skb_config[i].skbEthPriorityMark ));
+                                    __LINE__, (i + 1), pVlanCfg->skb_config[i].alias, pVlanCfg->skb_config[i].skbPort,
+                                    pVlanCfg->skb_config[i].skbMark, pVlanCfg->skb_config[i].skbEthPriorityMark ));
                     }
                     else
                     {
-                          CcspTraceError(("%s-%d: pDataModelMarking Or pVlanCfg->skb_config are Null \n", __FUNCTION__, __LINE__));
-                          return ANSC_STATUS_FAILURE;
+                        CcspTraceError(("%s-%d: pDataModelMarking Or pVlanCfg->skb_config are Null \n", __FUNCTION__, __LINE__));
+                        return ANSC_STATUS_FAILURE;
                     }
                 }
             }
@@ -843,7 +833,7 @@ ANSC_STATUS EthLink_GetMarking(char *ifname, vlan_configuration_t *pVlanCfg)
 static ANSC_STATUS EthLink_CreateUnTaggedInterface(PDML_ETHERNET pEntry)
 {
     ANSC_STATUS returnStatus = ANSC_STATUS_SUCCESS;
-    vlan_configuration_t VlanCfg;
+    vlan_configuration_t VlanCfg = {0};
 
     if (pEntry == NULL)
     {
@@ -914,7 +904,7 @@ static ANSC_STATUS EthLink_TriggerVlanRefresh(PDML_ETHERNET pEntry )
 {
     ANSC_STATUS returnStatus = ANSC_STATUS_SUCCESS;
     ethernet_link_status_e status = ETH_IF_DOWN;
-    vlan_configuration_t VlanCfg;
+    vlan_configuration_t VlanCfg = {0};
     INT iIterator = 0;
 
     if (pEntry == NULL)
@@ -957,9 +947,9 @@ static ANSC_STATUS EthLink_TriggerVlanRefresh(PDML_ETHERNET pEntry )
         VlanCfg.skb_config = NULL;
     }
 
-   /*TODO
-    * Need to be Reviewed the below code after Unification is finalised..
-    */
+    /*TODO
+     * Need to be Reviewed the below code after Unification is finalised..
+     */
     //Get status of VLAN link
     while(iIterator < 10)
     {
@@ -1038,10 +1028,11 @@ static ANSC_STATUS EthLink_CreateMarkingTable( PDML_ETHERNET pEntry, vlan_config
         PCOSA_DML_MARKING pDataModelMarking = (PCOSA_DML_MARKING)&(p_EthLink->pstDataModelMarking[iLoopCount]);
         if (pDataModelMarking != NULL)
         {
-            strcpy( pDataModelMarking->Alias, pVlanCfg->skb_config[iLoopCount].alias);
+            strncpy( pDataModelMarking->Alias, pVlanCfg->skb_config[iLoopCount].alias, sizeof(pDataModelMarking->Alias) - 1);
             pDataModelMarking->SKBPort = pVlanCfg->skb_config[iLoopCount].skbPort;
             pDataModelMarking->SKBMark = pVlanCfg->skb_config[iLoopCount].skbMark;
             pDataModelMarking->EthernetPriorityMark = pVlanCfg->skb_config[iLoopCount].skbEthPriorityMark;
+            CcspTraceInfo(("%s %d: %d) Alias = %s SKBPort = %d SKBMark = %d EthernetPriorityMark = %d\n", __FUNCTION__, __LINE__, iLoopCount, pDataModelMarking->Alias, pDataModelMarking->SKBPort, pDataModelMarking->SKBMark, pDataModelMarking->EthernetPriorityMark));
         }
     }
 
@@ -1087,8 +1078,8 @@ static ANSC_STATUS EthLink_GetUnTaggedVlanInterfaceStatus(const char *iface, eth
     struct ifreq intf;
 
     if(iface == NULL) {
-       *status = ETH_IF_NOTPRESENT;
-       return ANSC_STATUS_FAILURE;
+        *status = ETH_IF_NOTPRESENT;
+        return ANSC_STATUS_FAILURE;
     }
 
     if ((sfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -1210,13 +1201,13 @@ ANSC_STATUS EthLink_GetMacAddr( PDML_ETHERNET pEntry )
     arr[11] = arr[11] + pEntry->MACAddrOffSet;
 
     snprintf(hex, sizeof(hex), "%x%x%x%x%x%x%x%x%x%x%x%x", 
-    arr[0], arr[1], arr[2], arr[3], arr[4], arr[5], arr[6], arr[7], arr[8], arr[9], arr[10], arr[11]);
+            arr[0], arr[1], arr[2], arr[3], arr[4], arr[5], arr[6], arr[7], arr[8], arr[9], arr[10], arr[11]);
 
     snprintf(macStr, sizeof(macStr), "%c%c:%c%c:%c%c:%c%c:%c%c:%c%c",
-    hex[0], hex[1], hex[2], hex[3], hex[4], hex[5], hex[6], hex[7], hex[8], hex[9], hex[10], hex[11]);
+            hex[0], hex[1], hex[2], hex[3], hex[4], hex[5], hex[6], hex[7], hex[8], hex[9], hex[10], hex[11]);
 
-    strcpy(pEntry->MACAddress, macStr);
+    strncpy(pEntry->MACAddress, macStr, sizeof(pEntry->MACAddress) - 1);
 
     return ANSC_STATUS_SUCCESS;
- }
+        }
 
