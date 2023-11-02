@@ -465,6 +465,7 @@ static ANSC_STATUS Vlan_SetMacAddr( PDML_VLAN pEntry )
     char macStr[32];
     int i, j = 0;
     int add = 0;
+    int retry_count = 0;
 
 
     if(NULL == pEntry)
@@ -473,12 +474,29 @@ static ANSC_STATUS Vlan_SetMacAddr( PDML_VLAN pEntry )
         return ANSC_STATUS_FAILURE;
     }
 
-    if(0 != platform_hal_GetBaseMacAddress(acTmpReturnValue))
+    do
     {
-        CcspTraceError(("[%s][%d]Failed to get BaseMacAddress from HAL API\n", __FUNCTION__, __LINE__));
+        uint32_t b[6] = {0};
 
-        return ANSC_STATUS_FAILURE;
-    }
+        if (platform_hal_GetBaseMacAddress(acTmpReturnValue) != 0)
+        {
+            CcspTraceError(("[%s][%d]Failed to get BaseMacAddress from HAL API\n", __FUNCTION__, __LINE__));
+
+            return ANSC_STATUS_FAILURE;
+        }
+
+        if (strlen(acTmpReturnValue) != 17 || (6 != sscanf(acTmpReturnValue, "%02X:%02X:%02X:%02X:%02X:%02X", &b[5], &b[4], &b[3], &b[2], &b[1], &b[0])))
+        {
+            usleep(500000);
+            retry_count++;
+            CcspTraceInfo(("%s-%d invalid mac=%s, retry_count=%d \n", __FUNCTION__, __LINE__, acTmpReturnValue, retry_count));
+        }
+        else
+        {
+            CcspTraceInfo(("%s-%d valid mac=%s, retry_count=%d \n", __FUNCTION__, __LINE__, acTmpReturnValue, retry_count));
+            break;
+        }
+    } while (retry_count < 10);
 
     for(i = 0; acTmpReturnValue[i] != '\0'; i++)
     {
