@@ -114,6 +114,7 @@ static ANSC_STATUS EthLink_AddMarking(PDML_ETHERNET pEntry);
 static ANSC_STATUS EthLink_TriggerVlanRefresh(PDML_ETHERNET pEntry );
 #if !defined(VLAN_MANAGER_HAL_ENABLED)
 static ANSC_STATUS EthLink_SetEgressQoSMap( vlan_configuration_t *pVlanCfg );
+static ANSC_STATUS EthLink_SetMacAddr( PDML_ETHERNET pEntry );
 #endif
 
 #if defined(COMCAST_VLAN_HAL_ENABLED)
@@ -430,6 +431,8 @@ ANSC_STATUS EthLink_Disable(PDML_ETHERNET  pEntry)
                 CcspTraceError(("[%s-%d] Failed to delete UnTagged VLAN interface(%s)\n", __FUNCTION__, __LINE__, pEntry->Name));
             }
         }
+#else
+        v_secure_system("ip link delete %s", pEntry->Name);
 #endif
         pEntry->Status = ETH_IF_DOWN;
         //Notify Vlan Status to WAN Manager.
@@ -879,6 +882,17 @@ static ANSC_STATUS EthLink_CreateUnTaggedInterface(PDML_ETHERNET pEntry)
  * Need to Add Code for HAL Independent Untagged Vlan/Bridge Interface creation.
  */
     EthLink_CreateBridgeInterface(TRUE);
+#else
+    v_secure_system("ip link add link %s name %s type macvlan", pEntry->Alias, pEntry->Name);
+    v_secure_system("ip link set %s up", pEntry->Name);
+
+    if (EthLink_SetMacAddr(pEntry) == ANSC_STATUS_FAILURE)
+    {
+        CcspTraceError(("%s Failed to Set MacAddress \n", __FUNCTION__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    return returnStatus;
 #endif
     //Free VlanCfg skb_config memory
     if (VlanCfg.skb_config != NULL)
@@ -1084,6 +1098,62 @@ static ANSC_STATUS EthLink_SetEgressQoSMap( vlan_configuration_t *pVlanCfg )
 
     return ANSC_STATUS_SUCCESS;
 }
+
+static ANSC_STATUS EthLink_SetMacAddr( PDML_ETHERNET pEntry )
+{
+    unsigned long long int number, new_mac;
+    char acTmpReturnValue[256] = {0};
+    char hex[32];
+    char macStr[32];
+    int i, j = 0;
+    int retry_count = 0;
+
+    do
+    {
+        uint32_t b[6] = {0};
+
+        if (ANSC_STATUS_FAILURE == DmlEthGetParamValues(RDKB_PAM_COMPONENT_NAME, RDKB_PAM_DBUS_PATH, PAM_BASE_MAC_ADDRESS, acTmpReturnValue))
+        {
+            CcspTraceError(("[%s][%d]Failed to get param value\n", __FUNCTION__, __LINE__));
+            return ANSC_STATUS_FAILURE;
+        }
+
+        if (strlen(acTmpReturnValue) != 17 || (6 != sscanf(acTmpReturnValue, "%02X:%02X:%02X:%02X:%02X:%02X", &b[5], &b[4], &b[3], &b[2], &b[1], &b[0])))
+        {
+            usleep(500000);
+            retry_count++;
+            CcspTraceInfo(("%s-%d invalid mac=%s, retry_count=%d\n", __FUNCTION__, __LINE__, acTmpReturnValue, retry_count));
+        }
+        else
+        {
+            CcspTraceInfo(("%s-%d valid mac=%s, retry_count=%d\n", __FUNCTION__, __LINE__, acTmpReturnValue, retry_count));
+            break;
+        }
+    } while (retry_count < 10);
+
+    for(i = 0; acTmpReturnValue[i] != '\0'; i++)
+    {
+        if(acTmpReturnValue[i] != ':')
+        {
+            acTmpReturnValue[j++] = acTmpReturnValue[i];
+        }
+    }
+    acTmpReturnValue[j] = '\0';
+    sscanf(acTmpReturnValue, "%64llx", &number);
+
+    new_mac = number + pEntry->MACAddrOffSet;
+
+    snprintf(hex, sizeof(hex), "%016llx", new_mac);
+    snprintf(macStr, sizeof(macStr), "%c%c:%c%c:%c%c:%c%c:%c%c:%c%c",
+    hex[4], hex[5], hex[6], hex[7], hex[8], hex[9], hex[10], hex[11], hex[12], hex[13], hex[14], hex[15]);
+
+    CcspTraceInfo(("%s-%d: macStr:%s,pEntry->Name:%s\n", __FUNCTION__, __LINE__, macStr, pEntry->Name));
+
+    v_secure_system("ip link set dev %s address %s\n",pEntry->Name, macStr);
+
+    return ANSC_STATUS_SUCCESS;
+}
+
 #endif //VLAN_MANAGER_HAL_ENABLED
 
 static ANSC_STATUS EthLink_GetUnTaggedVlanInterfaceStatus(const char *iface, ethernet_link_status_e *status)
