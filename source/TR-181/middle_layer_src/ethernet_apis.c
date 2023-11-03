@@ -1054,7 +1054,6 @@ static ANSC_STATUS EthLink_SetEgressQoSMap( vlan_configuration_t *pVlanCfg )
 {
     INT SKBMark = 0;
     INT EthPriority = 0;
-    char command[512] = {0};
 
     if ((pVlanCfg == NULL) || (pVlanCfg->skb_config == NULL))
     {
@@ -1067,12 +1066,10 @@ static ANSC_STATUS EthLink_SetEgressQoSMap( vlan_configuration_t *pVlanCfg )
     {
         for(int i = 0; i < pVlanCfg->skbMarkingNumOfEntries; i++)
         {
-            memset(command, 0, sizeof(command));
 
             SKBMark = pVlanCfg->skb_config[i].skbMark;
             EthPriority = pVlanCfg->skb_config[i].skbEthPriorityMark;
-            snprintf(command, sizeof(command), "ip link set %s.%d type vlan egress-qos-map %d:%d", pVlanCfg->L3Interface, pVlanCfg->VLANId, SKBMark, EthPriority);
-            v_secure_system(command);
+            v_secure_system("ip link set %s.%d type vlan egress-qos-map %d:%d", pVlanCfg->L3Interface, pVlanCfg->VLANId, SKBMark, EthPriority);
         }
     }
 
