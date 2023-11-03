@@ -118,18 +118,13 @@ void get_uptime(long *uptime)
 #if !defined(VLAN_MANAGER_HAL_ENABLED)
 static ANSC_STATUS Vlan_DeleteInterface(PDML_VLAN p_Vlan)
 {
-     char cmd[256] = {0};
-     char wan_interface[10] = {0};
-     char buff[10] =  {0};
-
      if (NULL == p_Vlan)
      {
           CcspTraceError(("Error: Invalid arguement \n"));
           return ANSC_STATUS_FAILURE;
      }
 
-     snprintf(cmd, sizeof(cmd), "ip link delete %s", p_Vlan->Name);
-     v_secure_system(cmd);
+     v_secure_system("ip link delete %s", p_Vlan->Name);
 
      return ANSC_STATUS_SUCCESS;
 }
@@ -460,7 +455,6 @@ static ANSC_STATUS Vlan_SetMacAddr( PDML_VLAN pEntry )
 {
     unsigned long long int number, new_mac;
     char acTmpReturnValue[256] = {0};
-    char command[512] = {0};
     char hex[32];
     char macStr[32];
     int i, j = 0;
@@ -493,9 +487,7 @@ static ANSC_STATUS Vlan_SetMacAddr( PDML_VLAN pEntry )
     snprintf(macStr, sizeof(macStr), "%c%c:%c%c:%c%c:%c%c:%c%c:%c%c",
     hex[0], hex[1], hex[2], hex[3], hex[4], hex[5], hex[6], hex[7], hex[8], hex[9], hex[10], hex[11]);
 
-    snprintf(command, sizeof(command), "ip link set dev %s.%d address %s\n",pEntry->Alias, pEntry->VLANId, macStr);
-    v_secure_system(command);
-    memset(command, 0, sizeof(command));
+    v_secure_system("ip link set dev %s.%d address %s\n",pEntry->Alias, pEntry->VLANId, macStr);
 
     return ANSC_STATUS_SUCCESS;
 }
@@ -563,7 +555,6 @@ static ANSC_STATUS Vlan_CreateTaggedInterface(PDML_VLAN pEntry)
 static ANSC_STATUS Vlan_CreateTaggedInterface(PDML_VLAN pEntry)
 {
     ANSC_STATUS returnStatus = ANSC_STATUS_SUCCESS;
-    char cmd[256] = {0};
 
     if (pEntry == NULL)
     {
@@ -571,11 +562,8 @@ static ANSC_STATUS Vlan_CreateTaggedInterface(PDML_VLAN pEntry)
         return ANSC_STATUS_FAILURE;
     }
 
-    snprintf(cmd, sizeof(cmd), "ip link add link %s name %s type vlan id %u", pEntry->Alias , pEntry->Name, pEntry->VLANId);
-    v_secure_system(cmd);
-
-    snprintf(cmd, sizeof(cmd), "ip link set %s up", pEntry->Name);
-    v_secure_system(cmd);
+    v_secure_system("ip link add link %s name %s type vlan id %u", pEntry->Alias , pEntry->Name, pEntry->VLANId);
+    v_secure_system("ip link set %s up", pEntry->Name);
 
     if (Vlan_SetMacAddr(pEntry) == ANSC_STATUS_FAILURE)
     {
