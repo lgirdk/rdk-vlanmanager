@@ -339,6 +339,19 @@ ANSC_STATUS EthLink_Enable(PDML_ETHERNET  pEntry)
         CcspTraceInfo(("%s - %s:Successfully created UnTagged VLAN Interface(%s)\n",__FUNCTION__, ETH_MARKER_VLAN_IF_CREATE, pEntry->Name));
     }
 
+#ifdef _LG_MV3_
+    int table = (strcmp(pEntry->Name, "mg0") == 0) ? 100 :
+                (strcmp(pEntry->Name, "voip0") == 0) ? 200 : 0;
+
+    if (table > 0)
+    {
+        CcspTraceInfo(("%s-%d: setting ip route table for %s \n", __FUNCTION__, __LINE__, pEntry->Name));
+        v_secure_system("ip rule add oif %s table %d pref 0", pEntry->Name, table);
+        v_secure_system("ip rule add iif %s table %d pref 0", pEntry->Name, table);
+        v_secure_system("ip route add table %d unreachable default metric 4278198272", table);
+    }
+#endif
+
     return ANSC_STATUS_SUCCESS;
 }
 
@@ -410,6 +423,19 @@ ANSC_STATUS EthLink_Disable(PDML_ETHERNET  pEntry)
 
         CcspTraceInfo(("[%s-%d]  %s:Successfully deleted %s VLAN interface \n", __FUNCTION__, __LINE__, ETH_MARKER_VLAN_IF_DELETE, pEntry->Name)); 
     }
+
+#ifdef _LG_MV3_
+    int table = (strcmp(pEntry->Name, "mg0") == 0) ? 100 :
+                (strcmp(pEntry->Name, "voip0") == 0) ? 200 : 0;
+
+    if (table > 0)
+    {
+        CcspTraceInfo(("%s-%d: flushing ip route table for %s \n", __FUNCTION__, __LINE__, pEntry->Name));
+        v_secure_system("ip rule del oif %s table %d pref 0", pEntry->Name, table);
+        v_secure_system("ip rule del iif %s table %d pref 0", pEntry->Name, table);
+        v_secure_system("ip route flush table %d", table);
+    }
+#endif
 
     return returnStatus;
 }
