@@ -346,8 +346,8 @@ ANSC_STATUS EthLink_Enable(PDML_ETHERNET  pEntry)
     if (table > 0)
     {
         CcspTraceInfo(("%s-%d: setting ip route table for %s \n", __FUNCTION__, __LINE__, pEntry->Name));
-        v_secure_system("ip rule add oif %s table %d", pEntry->Name, table);
-        v_secure_system("ip rule add iif %s table %d", pEntry->Name, table);
+        v_secure_system("ip rule add oif %s table %d pref 0", pEntry->Name, table);
+        v_secure_system("ip rule add iif %s table %d pref 0", pEntry->Name, table);
         v_secure_system("ip route add table %d unreachable default metric 4278198272", table);
     }
 #endif
@@ -431,8 +431,8 @@ ANSC_STATUS EthLink_Disable(PDML_ETHERNET  pEntry)
     if (table > 0)
     {
         CcspTraceInfo(("%s-%d: flushing ip route table for %s \n", __FUNCTION__, __LINE__, pEntry->Name));
-        v_secure_system("ip rule del oif %s table %d", pEntry->Name, table);
-        v_secure_system("ip rule del iif %s table %d", pEntry->Name, table);
+        v_secure_system("ip rule del oif %s table %d pref 0", pEntry->Name, table);
+        v_secure_system("ip rule del iif %s table %d pref 0", pEntry->Name, table);
         v_secure_system("ip route flush table %d", table);
     }
 #endif
