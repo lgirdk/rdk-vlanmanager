@@ -190,7 +190,7 @@
       </parameter>
       <parameter>
        <name>VLANID</name>
-       <type>Int</type>
+       <type>int</type>
        <syntax>int</syntax>
        <writable>true</writable>
       </parameter>
