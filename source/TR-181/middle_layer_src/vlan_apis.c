@@ -158,6 +158,12 @@ static ANSC_STATUS Vlan_DeleteInterface(PDML_VLAN p_Vlan)
      }
 
      v_secure_system("ip link delete %s", p_Vlan->Name);
+#ifdef _LG_MV3_
+     if (!strcmp(p_Vlan->Name, "mg0") || !strcmp(p_Vlan->Name, "voip0"))
+     {
+         v_secure_system("ip link delete vrf-%s", p_Vlan->Name);
+     }
+#endif
 
      return ANSC_STATUS_SUCCESS;
 }
@@ -616,6 +622,19 @@ static ANSC_STATUS Vlan_CreateTaggedInterface(PDML_VLAN pEntry)
     }
 
     v_secure_system("ip link add link %s name %s type vlan id %u", pEntry->Alias , pEntry->Name, pEntry->VLANId);
+
+#ifdef _LG_MV3_
+    int table = (strcmp(pEntry->Name, "mg0") == 0) ? 100 :
+                (strcmp(pEntry->Name, "voip0") == 0) ? 200 : 0;
+
+    if (table > 0)
+    {
+        CcspTraceInfo(("%s-%d: setting vrf for %s \n", __FUNCTION__, __LINE__, pEntry->Name));
+        v_secure_system("ip link add vrf-%s type vrf table %d", pEntry->Name, table);
+        v_secure_system("ip link set dev vrf-%s up", pEntry->Name);
+        v_secure_system("ip link set dev %s master vrf-%s", pEntry->Name, pEntry->Name);
+    }
+#endif
 
     v_secure_system("ip link set %s up", pEntry->Name);
 
