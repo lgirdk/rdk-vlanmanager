@@ -447,6 +447,12 @@ ANSC_STATUS EthLink_Disable(PDML_ETHERNET  pEntry)
         }
 #else
         v_secure_system("ip link delete %s", pEntry->Name);
+#ifdef _LG_MV3_
+        if (!strcmp(pEntry->Name, "mg0") || !strcmp(pEntry->Name, "voip0"))
+        {
+            v_secure_system("ip link delete vrf-%s", pEntry->Name);
+        }
+#endif
 #endif
         pEntry->Status = ETH_IF_DOWN;
         //Notify Vlan Status to WAN Manager.
@@ -911,6 +917,18 @@ static ANSC_STATUS EthLink_CreateUnTaggedInterface(PDML_ETHERNET pEntry)
     EthLink_CreateBridgeInterface(TRUE);
 #else
     v_secure_system("ip link add link %s name %s type macvlan", pEntry->Alias, pEntry->Name);
+#ifdef _LG_MV3_
+    int table = (strcmp(pEntry->Name, "mg0") == 0) ? 100 :
+                (strcmp(pEntry->Name, "voip0") == 0) ? 200 : 0;
+
+    if (table > 0)
+    {
+        CcspTraceInfo(("%s-%d: setting vrf for %s \n", __FUNCTION__, __LINE__, pEntry->Name));
+        v_secure_system("ip link add vrf-%s type vrf table %d", pEntry->Name, table);
+        v_secure_system("ip link set dev vrf-%s up", pEntry->Name);
+        v_secure_system("ip link set dev %s master vrf-%s", pEntry->Name, pEntry->Name);
+    }
+#endif
     v_secure_system("ip link set %s up", pEntry->Name);
 
     if (EthLink_SetMacAddr(pEntry) == ANSC_STATUS_FAILURE)
