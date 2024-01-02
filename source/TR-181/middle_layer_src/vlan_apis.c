@@ -544,6 +544,8 @@ static ANSC_STATUS Vlan_SetMacAddr( PDML_VLAN pEntry )
     snprintf(macStr, sizeof(macStr), "%c%c:%c%c:%c%c:%c%c:%c%c:%c%c",
     hex[4], hex[5], hex[6], hex[7], hex[8], hex[9], hex[10], hex[11], hex[12], hex[13], hex[14], hex[15]);
 
+    CcspTraceInfo(("%s-%d: macStr:%s,pEntry->Name:%s \n", __FUNCTION__, __LINE__, macStr,pEntry->Name));
+
     v_secure_system("ip link set dev %s address %s",pEntry->Name, macStr);
 
     return ANSC_STATUS_SUCCESS;
