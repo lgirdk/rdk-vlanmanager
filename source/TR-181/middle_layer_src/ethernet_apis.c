@@ -1183,9 +1183,12 @@ static ANSC_STATUS EthLink_SetMacAddr( PDML_ETHERNET pEntry )
 
     new_mac = number + pEntry->MACAddrOffSet;
 
-    snprintf(hex, sizeof(hex), "%08llx", new_mac);
+
+    snprintf(hex, sizeof(hex), "%016llx", new_mac);
     snprintf(macStr, sizeof(macStr), "%c%c:%c%c:%c%c:%c%c:%c%c:%c%c",
-    hex[0], hex[1], hex[2], hex[3], hex[4], hex[5], hex[6], hex[7], hex[8], hex[9], hex[10], hex[11]);
+     hex[4], hex[5], hex[6], hex[7], hex[8], hex[9], hex[10], hex[11], hex[12], hex[13], hex[14], hex[15]);
+
+    CcspTraceInfo(("%s-%d: macStr:%s,pEntry->Name:%s \n", __FUNCTION__, __LINE__, macStr,pEntry->Name));
 
     v_secure_system("ip link set dev %s address %s\n",pEntry->Name, macStr);
 
