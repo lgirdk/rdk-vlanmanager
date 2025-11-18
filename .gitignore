@@ -1,0 +1,35 @@
+# Autotools generated files
+autom4te.cache/
+aclocal.m4
+configure
+cfg/compile
+cfg/config.guess
+cfg/config.h.in
+cfg/config.sub
+cfg/libtool.m4
+cfg/ltmain.sh
+cfg/ltoptions.m4
+cfg/ltsugar.m4
+cfg/ltversion.m4
+cfg/lt~obsolete.m4
+
+# Build artifacts
+*.o
+*.lo
+*.la
+.libs/
+.deps/
+Makefile
+Makefile.in
+config.log
+config.status
+cfg/config.h
+cfg/stamp-h1
+libtool
+
+# Editor temporary files
+*~
+*.swp
+*.swo
+.*.swp
+.*.swo
