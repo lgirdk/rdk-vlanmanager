@@ -462,7 +462,7 @@ static ANSC_STATUS Vlan_SetMacAddr( PDML_VLAN pEntry )
     char hex[32];
     char macStr[32];
     int i, j = 0;
-    int add = 0;
+    ULONG add = 0;
 
 
     if(NULL == pEntry)
@@ -488,7 +488,7 @@ static ANSC_STATUS Vlan_SetMacAddr( PDML_VLAN pEntry )
     acTmpReturnValue[j] = '\0';
     sscanf(acTmpReturnValue, "%64llx", &number);
 
-    if (Vlan_GetEthLinkMacOffSet(pEntry, (PULONG)&add) == ANSC_STATUS_FAILURE)
+    if (Vlan_GetEthLinkMacOffSet(pEntry, &add) == ANSC_STATUS_FAILURE)
     {
         CcspTraceError(("%s - Failed to set Enable data model\n", __FUNCTION__));
         return ANSC_STATUS_FAILURE;
