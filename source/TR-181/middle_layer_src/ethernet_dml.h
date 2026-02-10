@@ -86,6 +86,14 @@ EthLink_GetParamUlongValue
         ULONG*                      puLong
     );
 
+BOOL
+EthLink_GetParamIntValue
+    (
+        ANSC_HANDLE                 hInsContext,
+        char*                       ParamName,
+        int*                        pInt
+    );
+
 ULONG
 EthLink_GetParamStringValue
     (
@@ -109,6 +117,14 @@ EthLink_SetParamUlongValue
         ANSC_HANDLE                 hInsContext,
         char*                       ParamName,
         ULONG                       uValue
+    );
+
+BOOL
+EthLink_SetParamIntValue
+    (
+        ANSC_HANDLE                 hInsContext,
+        char*                       ParamName,
+        int                         iValue
     );
 
 BOOL

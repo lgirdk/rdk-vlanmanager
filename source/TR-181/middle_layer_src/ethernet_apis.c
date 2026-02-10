@@ -106,6 +106,7 @@ static ANSC_STATUS EthLink_GetVlanIdAndTPId(const PDML_ETHERNET pEntry, INT *pVl
 static int EthLink_GetActiveWanInterfaces(char *Alias);
 static ANSC_STATUS EthLink_DeleteMarking(PDML_ETHERNET pEntry);
 static ANSC_STATUS EthLink_CreateUnTaggedInterface(PDML_ETHERNET pEntry);
+static ANSC_STATUS EthLink_DeleteUnTaggedInterface(PDML_ETHERNET pEntry);
 /*TODO
 * Need to be Reviewed after Unification finalised.
 */
@@ -397,6 +398,16 @@ ANSC_STATUS EthLink_Disable(PDML_ETHERNET  pEntry)
             if (ANSC_STATUS_SUCCESS != returnStatus)
             {
                 CcspTraceError(("[%s-%d] Failed to delete UnTagged VLAN interface(%s)\n", __FUNCTION__, __LINE__, pEntry->Name));
+            }
+        }
+#elif !defined(COMCAST_VLAN_HAL_ENABLED)
+        // Delete untagged VLAN interface using ip link commands when both HALs are disabled
+        if ( ( status != ETH_IF_NOTPRESENT ) && ( status != ETH_IF_ERROR ) )
+        {
+            returnStatus = EthLink_DeleteUnTaggedInterface(pEntry);
+            if (ANSC_STATUS_SUCCESS != returnStatus)
+            {
+                CcspTraceError(("[%s-%d] Failed to delete untagged VLAN interface using ip link commands\n", __FUNCTION__, __LINE__));
             }
         }
 #endif
@@ -857,6 +868,33 @@ static ANSC_STATUS EthLink_CreateUnTaggedInterface(PDML_ETHERNET pEntry)
  * Need to Add Code for HAL Independent Untagged Vlan/Bridge Interface creation.
  */
     EthLink_CreateBridgeInterface(TRUE);
+#else
+    // Create untagged interface using MACVLAN for truly untagged traffic
+    CcspTraceInfo(("%s-%d: Creating MACVLAN untagged interface %s on base interface %s with MAC offset %ld\n", 
+                   __FUNCTION__, __LINE__, pEntry->Name, pEntry->BaseInterface, pEntry->MACAddrOffSet));
+    
+    // Get MAC address with offset applied
+    if (ANSC_STATUS_SUCCESS != EthLink_GetMacAddr(pEntry))
+    {
+        CcspTraceError(("%s-%d: Failed to get MAC address, creating MACVLAN without custom MAC\n", __FUNCTION__, __LINE__));
+        // Create MACVLAN without setting custom MAC - kernel will assign one
+        v_secure_system("ip link add link %s name %s type macvlan mode bridge", 
+                        pEntry->BaseInterface, pEntry->Name);
+    }
+    else
+    {
+        CcspTraceInfo(("%s-%d: Using MAC address: %s (offset: %ld)\n", 
+                       __FUNCTION__, __LINE__, pEntry->MACAddress, pEntry->MACAddrOffSet));
+        
+        // Create MACVLAN interface with custom MAC
+        v_secure_system("ip link add link %s name %s address %s type macvlan mode bridge", 
+                        pEntry->BaseInterface, pEntry->Name, pEntry->MACAddress);
+    }
+    
+    v_secure_system("ip link set %s up", pEntry->Name);
+    
+    CcspTraceInfo(("%s-%d: Successfully created MACVLAN untagged interface %s\n", 
+                   __FUNCTION__, __LINE__, pEntry->Name));
 #endif
     //Free VlanCfg skb_config memory
     if (VlanCfg.skb_config != NULL)
@@ -864,6 +902,28 @@ static ANSC_STATUS EthLink_CreateUnTaggedInterface(PDML_ETHERNET pEntry)
         free(VlanCfg.skb_config);
         VlanCfg.skb_config = NULL;
     }
+
+    return returnStatus;
+}
+
+static ANSC_STATUS EthLink_DeleteUnTaggedInterface(PDML_ETHERNET pEntry)
+{
+    ANSC_STATUS returnStatus = ANSC_STATUS_SUCCESS;
+
+    if (pEntry == NULL)
+    {
+        CcspTraceError(("%s-%d: Invalid parameter error\n", __FUNCTION__, __LINE__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    CcspTraceInfo(("%s-%d: Deleting untagged VLAN interface %s\n", 
+                   __FUNCTION__, __LINE__, pEntry->Name));
+    
+    v_secure_system("ip link set %s down", pEntry->Name);
+    v_secure_system("ip link delete %s", pEntry->Name);
+    
+    CcspTraceInfo(("%s-%d: Successfully deleted untagged VLAN interface %s\n", 
+                   __FUNCTION__, __LINE__, pEntry->Name));
 
     return returnStatus;
 }

@@ -111,7 +111,7 @@ _DML_ETHERNET
     CHAR                 LowerLayers[1024];
     CHAR                 Path[1024];
     CHAR                 MACAddress[18];
-    ULONG                MACAddrOffSet;
+    LONG                 MACAddrOffSet;  // Changed to LONG to support negative offsets
     BOOLEAN              PriorityTagging;
     UINT                 NumberofMarkingEntries;
     PCOSA_DML_MARKING    pstDataModelMarking;

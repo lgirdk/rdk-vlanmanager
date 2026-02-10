@@ -88,8 +88,9 @@
       </parameter>
       <parameter>
        <name>MACAddrOffSet</name>
-       <type>unsignedInt</type>
-       <syntax>uint32</syntax>
+       <type>int</type>
+       <syntax>int</syntax>
+       <writable>true</writable>
       </parameter>
       <parameter>
        <name>PriorityTagging</name>
