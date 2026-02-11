@@ -873,6 +873,11 @@ static ANSC_STATUS EthLink_CreateUnTaggedInterface(PDML_ETHERNET pEntry)
     CcspTraceInfo(("%s-%d: Creating MACVLAN untagged interface %s on base interface %s with MAC offset %ld\n", 
                    __FUNCTION__, __LINE__, pEntry->Name, pEntry->BaseInterface, pEntry->MACAddrOffSet));
     
+    // Check if interface already exists (as MACVLAN or bridge) and delete it
+    CcspTraceInfo(("%s-%d: Checking if interface %s already exists\n", __FUNCTION__, __LINE__, pEntry->Name));
+    v_secure_system("ip link show %s > /dev/null 2>&1 && (ip link set %s down; ip link delete %s)", 
+                    pEntry->Name, pEntry->Name, pEntry->Name);
+    
     // Get MAC address with offset applied
     if (ANSC_STATUS_SUCCESS != EthLink_GetMacAddr(pEntry))
     {
