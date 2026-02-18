@@ -896,6 +896,11 @@ static ANSC_STATUS EthLink_CreateUnTaggedInterface(PDML_ETHERNET pEntry)
                         pEntry->BaseInterface, pEntry->Name, pEntry->MACAddress);
     }
     
+    // Set MTU to default 1500
+    CcspTraceInfo(("%s-%d: Setting MTU to 1500 for MACVLAN interface %s\n", 
+                   __FUNCTION__, __LINE__, pEntry->Name));
+    v_secure_system("ip link set %s mtu 1500", pEntry->Name);
+    
     v_secure_system("ip link set %s up", pEntry->Name);
     
     CcspTraceInfo(("%s-%d: Successfully created MACVLAN untagged interface %s\n", 
