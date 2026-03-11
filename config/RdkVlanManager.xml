@@ -38,9 +38,11 @@
       <func_GetParamBoolValue>EthLink_GetParamBoolValue</func_GetParamBoolValue>
       <func_GetParamUlongValue>EthLink_GetParamUlongValue</func_GetParamUlongValue>
       <func_GetParamStringValue>EthLink_GetParamStringValue</func_GetParamStringValue>
+      <func_GetParamIntValue>EthLink_GetParamIntValue</func_GetParamIntValue>
       <func_SetParamBoolValue>EthLink_SetParamBoolValue</func_SetParamBoolValue>
       <func_SetParamUlongValue>EthLink_SetParamUlongValue</func_SetParamUlongValue>
       <func_SetParamStringValue>EthLink_SetParamStringValue</func_SetParamStringValue>
+      <func_SetParamIntValue>EthLink_SetParamIntValue</func_SetParamIntValue>
       <func_Validate>EthLink_Validate</func_Validate>
       <func_Commit>EthLink_Commit</func_Commit>
       <func_Rollback>EthLink_Rollback</func_Rollback>
@@ -88,8 +90,9 @@
       </parameter>
       <parameter>
        <name>MACAddrOffSet</name>
-       <type>unsignedInt</type>
-       <syntax>uint32</syntax>
+       <type>int</type>
+       <syntax>int</syntax>
+       <writable>true</writable>
       </parameter>
       <parameter>
        <name>PriorityTagging</name>

@@ -412,7 +412,7 @@ void * Vlan_Disable(void *Arg)
 }
 
 #if !defined(VLAN_MANAGER_HAL_ENABLED)
-static ANSC_STATUS Vlan_GetEthLinkMacOffSet(PDML_VLAN pEntry, ULONG* pOffSet)
+static ANSC_STATUS Vlan_GetEthLinkMacOffSet(PDML_VLAN pEntry, int* pOffSet)
 {
     INT iEthLinkInstance = -1;
     INT EthLinkInstance = -1;
@@ -445,7 +445,7 @@ static ANSC_STATUS Vlan_GetEthLinkMacOffSet(PDML_VLAN pEntry, ULONG* pOffSet)
     }
 
     //Get MacOffSet.
-    if (EthLink_GetParamUlongValue(pNewEntry, "MACAddrOffSet", pOffSet) != TRUE)
+    if (EthLink_GetParamIntValue(pNewEntry, "MACAddrOffSet", pOffSet) != TRUE)
     {
         CcspTraceError(("%s - Failed to set Enable data model\n", __FUNCTION__));
         return ANSC_STATUS_FAILURE;
@@ -488,7 +488,7 @@ static ANSC_STATUS Vlan_SetMacAddr( PDML_VLAN pEntry )
     acTmpReturnValue[j] = '\0';
     sscanf(acTmpReturnValue, "%64llx", &number);
 
-    if (Vlan_GetEthLinkMacOffSet(pEntry, (PULONG)&add) == ANSC_STATUS_FAILURE)
+    if (Vlan_GetEthLinkMacOffSet(pEntry, &add) == ANSC_STATUS_FAILURE)
     {
         CcspTraceError(("%s - Failed to set Enable data model\n", __FUNCTION__));
         return ANSC_STATUS_FAILURE;
